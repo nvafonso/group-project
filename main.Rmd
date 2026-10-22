@@ -38,10 +38,46 @@ This analysis is exploratory. The model does not account for
 participants belonging to the same team, and the variables were
 selected after examining correlations.
 
+## Simulation
+
+The simulation generates hypothetical HEXACO profiles and teamwork-quality
+outcomes under different team-formation strategies. Its results depend on
+the assumptions and settings in the script; they are not estimates of proven
+effects in real teams.
+
+The simulation logic is shared with the Shiny app through
+`outputs/simulation_core.R`.
+
+To generate the simulated data, run this code from the project root:
+
+```{r run-simulation, eval=FALSE}
+source("outputs/data_simulation_fixed.R")
+```
+
+Generated files are saved in the `simulated_data/` folder.
+
 ## Interactive app
 
-This section will provide the command to launch the Shiny app and
-explain how to use its controls.
+The Shiny app lets users explore the observed questionnaire data and compare
+hypothetical team-formation strategies using simulated data.
+
+To launch it from the project root in R, run:
+
+```{r launch-app, eval=FALSE}
+shiny::runApp("outputs")
+```
+
+The app uses `outputs/app.R` and the shared simulation logic in
+`outputs/simulation_core.R`. `outputs/sample_observed_upload.csv` is a sample
+file for trying the data-upload feature.
+
+## Project files
+
+- `data_processing.R` — prepares and analyzes the observed questionnaire data.
+- `outputs/data_simulation_fixed.R` — generates simulated data files.
+- `outputs/simulation_core.R` — shared simulation functions used by the simulation script and app.
+- `outputs/app.R` — Shiny app for exploring observed and simulated data.
+- `outputs/sample_observed_upload.csv` — sample CSV for testing uploads.
 
 ## Limitations
 
