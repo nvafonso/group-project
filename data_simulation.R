@@ -24,6 +24,18 @@
 #
 # Requires R >= 4.1 and packages: dplyr, tidyr, ggplot2
 # ============================================================
+# How to read this script:
+# 1. It reads processed questionnaire scores from data/processed_data.csv.
+#    These scores provide descriptive inputs, such as trait averages and
+#    correlations; they do not estimate causal effects.
+# 2. It generates hypothetical teams and teamwork outcomes using the
+#    assumptions configured below. The results are illustrative, not
+#    predictions about real teams.
+# 3. It checks the generated data and writes CSV summaries and figures to
+#    simulated_data/.
+#
+# To run: open the project in RStudio, set the project folder as the working
+# directory, then run source("data_simulation.R").
 
 if (getRversion() < "4.1.0") {
   stop("This script requires R >= 4.1.0 because it uses the native pipe |>.",
