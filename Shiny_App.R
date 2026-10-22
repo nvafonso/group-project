@@ -2,7 +2,7 @@
 # Version: Prototype v2
 # Author: Adéla Kovářová (2026)
 # Purpose: Review questionnaire data and explore hypothetical team-formation scenarios.
-# Run from the project folder with: shiny::runApp("outputs")
+# Run from the project folder with: shiny::runApp("Shiny_App.R")
 #
 # Observed-data exploration is separate from hypothetical simulation.
 # Simulation scores are illustrative assumptions, not empirical predictions.
@@ -11,19 +11,13 @@
 library(shiny)
 library(ggplot2)
 
-simulation_core_candidates <- c(
-  "simulation_core.R",
-  file.path("src", "simulation_core.R"),
-  file.path("outputs", "simulation_core.R"),
-  file.path("..", "src", "simulation_core.R")
-)
-simulation_core_path <- simulation_core_candidates[file.exists(simulation_core_candidates)]
-if (!length(simulation_core_path)) {
-  stop("Shared simulation_core.R was not found beside app.R, in src/, or in outputs/.", call.=FALSE)
+simulation_core_path <- "simulation_core.R"
+if (!file.exists(simulation_core_path)) {
+  stop("simulation_core.R was not found in the project root. Open the project folder and run Shiny_App.R from there.", call.=FALSE)
 }
-source(simulation_core_path[[1]], local=TRUE)
+source(simulation_core_path, local=TRUE)
 
-# URL used to download the dataset if no local data.csv file is available.
+# Online fallback used only if the project raw data file is unavailable.
 data_url <- "https://osf.io/download/k4syv/"
 
 # Define which questionnaire columns belong to each of the six HEXACO traits.
@@ -74,14 +68,16 @@ named_choices <- function(ids) {
 
 find_team_id_column <- function(column_names) {
   normalized <- tolower(gsub("[^[:alnum:]]", "", column_names))
-  for (candidate in c("teamid", "team", "teamnumber", "teamno", "groupid", "group")) {
+  # Generic group labels may identify an experimental condition, so only accept
+  # explicit team labels.
+  for (candidate in c("teamid", "team", "teamnumber", "teamno")) {
     hit <- which(normalized == candidate)
     if (length(hit)) return(column_names[hit[[1]]])
   }
   NULL
 }
 
-# Load either the synthetic output produced by data_simulation_fixed.R or the
+# Load either the synthetic output produced by data_simulation.R or the
 # observed questionnaire dataset. Simulated data are never silently replaced
 # with observed data if the requested simulation file is unavailable.
 read_delimited_data <- function(path) {
@@ -122,31 +118,29 @@ load_data <- function(source = c("observed", "simulated", "uploaded"), upload_pa
     return(read_delimited_data(upload_path))
   }
   if (source == "simulated") {
-    candidates <- c(
-      file.path("simulated_data", "combined_individual_level_results.csv"),
-      file.path("outputs", "simulated_data", "combined_individual_level_results.csv"),
-      file.path("..", "simulated_data", "combined_individual_level_results.csv")
-    )
-    existing <- candidates[file.exists(candidates)]
-    if (!length(existing)) {
+    simulated_file <- file.path("simulated_data", "combined_individual_level_results.csv")
+    if (!file.exists(simulated_file)) {
       stop(paste(
-        "The simulated dataset was not found. Run data_simulation_fixed.R first.",
+        "The simulated dataset was not found. Run data_simulation.R from the project root first.",
         "Expected simulated_data/combined_individual_level_results.csv."
       ), call. = FALSE)
     }
-    return(read_delimited_data(existing[[1]]))
+    return(read_delimited_data(simulated_file))
   }
 
-  # For observed data, prefer a local data.csv; otherwise try the OSF download.
-  if (file.exists("data.csv")) {
-    d <- read_delimited_data("data.csv")
+  # Prefer the project's raw questionnaire file, then an optional root data.csv,
+  # and finally the original OSF download.
+  observed_candidates <- c(file.path("data", "HEXACO_TWQ_raw-data.csv"), "data.csv")
+  observed_file <- observed_candidates[file.exists(observed_candidates)]
+  if (length(observed_file)) {
+    d <- read_delimited_data(observed_file[[1]])
   } else {
     d <- tryCatch(read_delimited_data(data_url), error = function(e) NULL)
   }
   if (is.null(d) || !nrow(d)) {
     stop(paste(
       "Could not load the observed dataset. Check your internet connection",
-      "or place a copy of the dataset in this folder as data.csv."
+      "or confirm data/HEXACO_TWQ_raw-data.csv is present."
     ), call. = FALSE)
   }
   d
@@ -342,7 +336,7 @@ ui <- bslib::page_fluid(
           conditionalPanel(
             condition = "input.data_source == 'uploaded'",
             fileInput("observed_file", "Choose a CSV file", accept = c(".csv", ".txt")),
-            helpText("Upload a CSV with a header row. Comma- and semicolon-separated files are supported; use HEXACO/TWQ item codes or scale columns.")
+            helpText("Upload a CSV with a header row. Comma- and semicolon-separated files are supported; use HEXACO/TWQ item codes or scale columns. Item-level uploads should contain the original 1–5 responses; the app reverses items marked r. If your item responses were already reverse-scored, upload scale scores instead.")
           ),
           conditionalPanel(
             condition = "input.data_source == 'simulated'",
@@ -370,7 +364,13 @@ ui <- bslib::page_fluid(
           ),
           div(class="panel-card",h3("Analysis results"),p(class="section-intro","Participant-level scores from the selected source."),plotOutput("scatter",height=390)),
           div(class="panel-card",h4("Exploratory regression"),verbatimTextOutput("model_summary"),
-              p(class="text-muted","The model reports a standardized beta and 95% confidence interval. When a team ID is available, standard errors are clustered by team. The plot's trend band is descriptive; association does not imply causation."))
+              p(class="text-muted","The model reports a standardized beta and 95% confidence interval. When a team ID is available, standard errors are clustered by team. With fewer than 20 teams, these standard errors can be anti-conservative; a mixed model with a team random intercept or a wild cluster bootstrap is a sturdier check. The plot's trend band is descriptive; association does not imply causation.")),
+          div(class="panel-card",
+              h4("Observed team-level patterns"),
+              p(class="section-intro","Each point is one existing team. Compare its average trait score and its within-team trait SD with the team's average teamwork score. These descriptive views correspond to the two kinds of assumptions explored by the simulation."),
+              plotOutput("team_level_plot",height=430),
+              verbatimTextOutput("team_level_summary"),
+              p(class="text-muted","Team counts are small, so these patterns and slopes are descriptive references only. They are not causal estimates and should not be treated as precise values for the simulation sliders."))
         )
       )
     ),
@@ -498,14 +498,14 @@ ui <- bslib::page_fluid(
           tags$li("Catalogue record and attribution: ",tags$a(href="https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/",target="_blank",rel="noopener noreferrer","Item Response Warehouse — zaehl2023_hexaco")),
           tags$li("Licence: ",tags$a(href="https://creativecommons.org/licenses/by/4.0/",target="_blank",rel="noopener noreferrer","Creative Commons Attribution 4.0 International (CC BY 4.0)"))
         ),
-        p(class="text-muted","The app may load a local file named data.csv or, if it is not present, try the original OSF download. The observed-data controls are separate from the generated participant pool used in the simulation tab.")
+        p(class="text-muted","The app loads data/HEXACO_TWQ_raw-data.csv from the project when available, with the original OSF download as a fallback. The observed-data controls are separate from the generated participant pool used in the simulation tab.")
       ),
       fluidRow(
         column(6,
           div(class="panel-card",
             h3("Analysis results: explore data"),
             p("Use this tab to review observed questionnaire data, upload a CSV, or inspect the standalone generated simulation dataset."),
-            p("The observed-data option uses a local data.csv when available and otherwise tries the configured online dataset. The simulated-data option reads the CSV created by the standalone simulation script."),
+            p("The observed-data option uses data/HEXACO_TWQ_raw-data.csv when available and otherwise tries the configured online dataset. The simulated-data option reads simulated_data/combined_individual_level_results.csv created by data_simulation.R."),
             tags$ul(
               tags$li("CSV uploads may contain recognized HEXACO and teamwork-quality questionnaire items or already calculated scale columns. Comma- and semicolon-separated files are supported."),
               tags$li("The app shows descriptive summaries and a plot of one selected HEXACO trait against one teamwork-quality score."),
@@ -710,19 +710,114 @@ server <- function(input,output,session) {
     cat(sprintf("Standardized beta: %.3f\n95%% CI: [%.3f, %.3f]\n",beta,ci[[1]],ci[[2]]))
     cat("Beta is the expected SD change in teamwork score per 1 SD increase in the selected HEXACO trait.\n")
     if (!is.null(team_col) && team_count<20) {
-      cat("Caution: fewer than 20 team clusters; the cluster-robust interval may be unstable.\n")
+      cat("Caution: fewer than 20 team clusters; cluster-robust standard errors can be anti-conservative. A mixed model with a team random intercept or a wild cluster bootstrap is a sturdier check.\n")
     }
   })
 
+  # OBSERVED TEAM-LEVEL VIEW
+  # Aggregate each existing team so the analysis can describe team composition
+  # and within-team trait diversity alongside the team's average TWQ score.
+  observed_team_data <- reactive({
+    d <- raw_data()
+    team_col <- find_team_id_column(names(d))
+    validate(
+      need(!is.null(team_col), "No team ID column was detected in this dataset."),
+      need(input$trait %in% names(d) && input$outcome %in% names(d),
+           "The selected trait or teamwork score is unavailable in this dataset.")
+    )
+    trait_values <- suppressWarnings(as.numeric(as.character(d[[input$trait]])))
+    outcome_values <- suppressWarnings(as.numeric(as.character(d[[input$outcome]])))
+    team_values <- as.character(d[[team_col]])
+    valid <- is.finite(trait_values) & is.finite(outcome_values) &
+      !is.na(team_values) & nzchar(trimws(team_values))
+    validate(need(sum(valid) >= 3L, "At least three complete participants with team IDs are needed."))
+
+    team_rows <- split(which(valid), factor(team_values[valid], levels=unique(team_values[valid])))
+    team_data <- do.call(rbind, lapply(team_rows, function(rows) {
+      data.frame(
+        Team=team_values[rows[[1]]],
+        participants=length(rows),
+        team_mean_trait=mean(trait_values[rows]),
+        team_sd_trait=if (length(rows) >= 2L) stats::sd(trait_values[rows]) else NA_real_,
+        team_mean_outcome=mean(outcome_values[rows]),
+        stringsAsFactors=FALSE
+      )
+    }))
+    rownames(team_data) <- NULL
+    validate(need(nrow(team_data) >= 2L, "At least two teams with complete data are needed."))
+    attr(team_data, "team_column") <- team_col
+    team_data
+  })
+
+  output$team_level_plot <- renderPlot({
+    team_data <- observed_team_data()
+    mean_points <- data.frame(
+      team=team_data$Team, metric="Team mean trait",
+      value=team_data$team_mean_trait, team_mean_outcome=team_data$team_mean_outcome
+    )
+    sd_points <- team_data[is.finite(team_data$team_sd_trait), , drop=FALSE]
+    sd_points <- data.frame(
+      team=sd_points$Team, metric="Within-team trait SD",
+      value=sd_points$team_sd_trait, team_mean_outcome=sd_points$team_mean_outcome
+    )
+    plot_data <- rbind(mean_points, sd_points)
+    trend_data <- do.call(rbind, lapply(split(plot_data, plot_data$metric), function(points) {
+      if (nrow(points) >= 3L && stats::sd(points$value) > 0 &&
+          stats::sd(points$team_mean_outcome) > 0) points else NULL
+    }))
+    p <- ggplot(plot_data, aes(x=value, y=team_mean_outcome))+
+      geom_point(colour="#63F3FF",size=3,alpha=.9)+
+      facet_wrap(~metric,scales="free_x",ncol=2)+
+      labs(x="Observed team-level trait measure",y=paste("Team mean",unname(nice_names[input$outcome])),
+           title=paste("Team composition and",unname(nice_names[input$outcome])),
+           subtitle="One point per team; within-team SD is available only for teams with at least two complete participants")+
+      theme_app()
+    if (is.data.frame(trend_data) && nrow(trend_data) > 0L) {
+      p <- p+geom_smooth(data=trend_data, aes(x=value,y=team_mean_outcome),
+                          inherit.aes=FALSE,method="lm",formula=y~x,se=FALSE,
+                          colour="#FF4FD8",linewidth=1)
+    }
+    p
+  })
+
+  output$team_level_summary <- renderPrint({
+    team_data <- observed_team_data()
+    team_col <- attr(team_data, "team_column")
+    cat("Team ID column:",team_col,"\n")
+    cat("Teams with complete data:",nrow(team_data),"\n")
+    cat("Participants included:",sum(team_data$participants),"\n")
+    cat("Teams contributing to within-team SD:",sum(is.finite(team_data$team_sd_trait)),"\n")
+    report_slope <- function(predictor, label) {
+      valid <- is.finite(predictor) & is.finite(team_data$team_mean_outcome)
+      if (sum(valid) < 3L || stats::sd(predictor[valid]) <= 0) {
+        cat(label,": not enough team-level variation to estimate a slope.\n")
+        return(invisible(NULL))
+      }
+      fit <- lm(team_data$team_mean_outcome[valid] ~ as.numeric(scale(predictor[valid])))
+      estimate <- unname(coef(fit)[[2]])
+      cat(sprintf("%s: %.3f teamwork-score points per 1 SD across teams (descriptive)\n",label,estimate))
+    }
+    report_slope(team_data$team_mean_trait,"Team mean trait association")
+    report_slope(team_data$team_sd_trait,"Within-team diversity association")
+    cat("These are unadjusted, descriptive team-level associations; they are not causal effects or precise slider estimates.\n")
+    if (nrow(team_data) < 20L) {
+      cat("Caution: fewer than 20 teams. Cluster-robust standard errors can be anti-conservative; a mixed model with a team random intercept or a wild cluster bootstrap is a sturdier inferential check.\n")
+    }
+  })
   # SIMULATION ENGINE
   # Always use the standalone simulation output here, independent of the dataset
   # selected in Analysis results. Sample complete rows to preserve HEXACO correlations.
   simulations <- eventReactive(input$run_sim, {
+    validate(need(
+      length(input$seed) == 1L && is.finite(input$seed) &&
+        input$seed == floor(input$seed) && input$seed >= 0 && input$seed <= 2147483647,
+      "Enter a seed (a whole number between 0 and 2147483647)."
+    ))
     d <- tryCatch(load_data("simulated"), error=function(e) e)
     if (inherits(d, "error")) {
       validate(need(FALSE, conditionMessage(d)))
     }
-    validate(need("Scenario" %in% names(d), "The generated file has no Scenario column. Rerun data_simulation_fixed.R."))
+    validate(need("Scenario" %in% names(d), "The generated file has no Scenario column. Rerun data_simulation.R."))
     d <- d[as.character(d$Scenario) == input$sim_scenario, , drop=FALSE]
     validate(need(nrow(d) > 0, paste("No generated rows found for", input$sim_scenario, "scenario.")))
     d <- score_scales(d)
@@ -769,8 +864,40 @@ server <- function(input,output,session) {
     )
     idx <- 1L
 
-    # Reset the random stream for each explicit run so the same controls reproduce results.
+    # Keep standardization references fixed for this click. Team means have an
+    # analytic reference under iid sampling with replacement; estimate the
+    # within-team SD reference once using an independent 2,000-team pilot.
+    population_trait_means <- setNames(
+      vapply(trait_names, function(tr) mean(d_sim[[tr]]), numeric(1)), trait_names
+    )
+    population_trait_sds <- setNames(
+      vapply(trait_names, function(tr) stats::sd(d_sim[[tr]]), numeric(1)), trait_names
+    )
+    composition_reference_means <- population_trait_means
+    composition_reference_sds <- population_trait_sds / sqrt(team_size)
+    composition_reference_sds[!is.finite(composition_reference_sds) |
+                                composition_reference_sds <= 0] <- 1
+
     set.seed(seed)
+    diversity_pilot_teams <- 2000L
+    pilot_sample <- sample(
+      seq_len(nrow(d_sim)), size=diversity_pilot_teams * team_size, replace=TRUE
+    )
+    pilot_people <- d_sim[pilot_sample, trait_names, drop=FALSE]
+    pilot_team_ids <- rep(seq_len(diversity_pilot_teams), each=team_size)
+    unit_reference <- setNames(rep(1, length(trait_names)), trait_names)
+    pilot_components <- hexaco_team_trait_components(
+      people=pilot_people, team_ids=pilot_team_ids, traits=trait_names,
+      trait_reference_means=population_trait_means,
+      trait_reference_sds=unit_reference,
+      diversity_reference_means=population_trait_means,
+      diversity_reference_sds=unit_reference
+    )
+    diversity_reference_means <- colMeans(pilot_components$team_sds)
+    diversity_reference_sds <- apply(pilot_components$team_sds, 2, stats::sd)
+    diversity_reference_sds[!is.finite(diversity_reference_sds) |
+                              diversity_reference_sds <= 0] <- 1
+
     withProgress(message="Running paired simulation", value=0, {
     progress_step <- max(1L, floor(reps / 100L))
 
@@ -780,50 +907,14 @@ server <- function(input,output,session) {
       people <- d_sim[sampled, trait_names, drop=FALSE]
       person_group_trait <- people[[trait_name]]
 
-      # Random assignment.
-      random_team <- sample(rep(seq_len(n_teams), each=team_size))
-
-      # Similar-score assignment: adjacent sorted scores go into the same team.
-      ord <- order(person_group_trait)
-      sim_team <- integer(length(ord))
-      sim_team[ord] <- rep(seq_len(n_teams), each=team_size)
-
-      # Balanced assignment: alternate the sorted scores across teams in a snake pattern.
-      bal_team <- integer(length(ord))
-      for (k in seq_along(ord)) {
-        row <- (k - 1L) %/% n_teams
-        col <- (k - 1L) %% n_teams
-        if (row %% 2L == 1L) col <- n_teams - 1L - col
-        bal_team[ord[k]] <- col + 1L
-      }
-
-      strategies <- list(Random=random_team, Balanced=bal_team, Similar=sim_team)
-
-      population_trait_means <- vapply(trait_names, function(tr) mean(d_sim[[tr]], na.rm=TRUE), numeric(1))
-      population_trait_sds <- vapply(trait_names, function(tr) stats::sd(d_sim[[tr]], na.rm=TRUE), numeric(1))
-      unit_reference <- setNames(rep(1, length(trait_names)), trait_names)
-      random_components <- hexaco_team_trait_components(
-        people=people, team_ids=random_team, traits=trait_names,
-        trait_reference_means=population_trait_means,
-        trait_reference_sds=unit_reference,
-        diversity_reference_means=population_trait_means,
-        diversity_reference_sds=unit_reference
+      # Shared helper preserves the grouping rules and verifies exact team sizes.
+      strategies <- hexaco_assign_teams(
+        person_group_trait=person_group_trait,
+        n_teams=n_teams,
+        team_size=team_size
       )
-      composition_reference_means <- colMeans(random_components$team_means)
-      composition_reference_sds <- apply(random_components$team_means, 2, stats::sd)
-      invalid_composition_reference <- !is.finite(composition_reference_sds) | composition_reference_sds <= 0
-      composition_reference_sds[invalid_composition_reference] <-
-        population_trait_sds[invalid_composition_reference] / sqrt(team_size)
-      composition_reference_sds[!is.finite(composition_reference_sds) |
-                                  composition_reference_sds <= 0] <- 1
 
-      # Compute team SDs for all strategies first, then use the Random teams
-      # as a fixed within-run reference for every strategy's diversity effect.
-      random_team_sds <- random_components$team_sds
-      diversity_reference_means <- colMeans(random_team_sds, na.rm=TRUE)
-      diversity_reference_sds <- apply(random_team_sds, 2, stats::sd, na.rm=TRUE)
-      diversity_reference_sds[!is.finite(diversity_reference_sds) |
-                                diversity_reference_sds <= 0] <- 1
+      # Apply the same fixed pool- and pilot-based references to every run and strategy.
       team_components_by_strategy <- lapply(strategies, function(team_id) {
         hexaco_team_trait_components(
           people=people, team_ids=team_id, traits=trait_names,
