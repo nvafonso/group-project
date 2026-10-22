@@ -38,54 +38,59 @@ This analysis is exploratory. The model does not account for
 participants belonging to the same team, and the variables were
 selected after examining correlations.
 
+
 ## Simulation
 
 The simulation generates hypothetical HEXACO profiles and teamwork-quality
-outcomes under different team-formation strategies. Its results depend on
-the assumptions and settings in the script; they are not estimates of proven
-effects in real teams.
+outcomes under different team-formation strategies. Its parameters are
+assumptions for exploration, not estimates of causal effects.
 
-The simulation logic is shared with the Shiny app through
-`outputs/simulation_core.R`.
+The shared `simulation_core.R` file is in the project root. The standalone
+`data_simulation.R` script uses that shared logic and writes generated files
+to the simulation output folder.
 
-To generate the simulated data, run this code from the project root:
+To generate the simulated data, run this chunk manually when needed. It is
+not run when knitting this report.
 
-```{r run-simulation, eval=FALSE}
-source("outputs/data_simulation_fixed.R")
+```{r generate-simulated-data, eval=FALSE}
+source("data_simulation.R")
 ```
-
-Generated files are saved in the `simulated_data/` folder.
 
 ## Interactive app
 
-The Shiny app lets users explore the observed questionnaire data and compare
-hypothetical team-formation strategies using simulated data.
-
-To launch it from the project root in R, run:
+The Shiny app provides controls for exploring the observed data and
+comparing simulated team-formation strategies. To launch it from the project
+root, run:
 
 ```{r launch-app, eval=FALSE}
-shiny::runApp("outputs")
+shiny::runApp("Shiny_App.R")
 ```
 
-The app uses `outputs/app.R` and the shared simulation logic in
-`outputs/simulation_core.R`. `outputs/sample_observed_upload.csv` is a sample
-file for trying the data-upload feature.
+The app uses `simulation_core.R` for shared simulation calculations. The
+`data_simulation_copy.R` file is a copy; `data_simulation.R` is the script
+documented here as the main simulation script.
 
 ## Project files
 
-- `data_processing.R` — prepares and analyzes the observed questionnaire data.
-- `outputs/data_simulation_fixed.R` — generates simulated data files.
-- `outputs/simulation_core.R` — shared simulation functions used by the simulation script and app.
-- `outputs/app.R` — Shiny app for exploring observed and simulated data.
-- `outputs/sample_observed_upload.csv` — sample CSV for testing uploads.
+- `data/` — questionnaire data files.
+- `figures/` — project figures.
+- `src/` — analysis code and other source files.
+- `Shiny_App.R` — interactive Shiny app.
+- `data_simulation.R` — standalone data simulation script.
+- `simulation_core.R` — shared simulation functions.
+- `main.Rmd` — this report.
 
 ## Limitations
 
-Participants are grouped within existing teams, which must be
-considered when choosing and interpreting the statistical analysis.
-Observed associations do not establish causation.
+The observed sample is small, and participants belong to existing teams.
+Analyses should account for that grouping where appropriate. Observed
+associations do not establish causation. Simulated results depend on the
+assumptions and settings selected in the simulation.
 
 ## References
+
+- Zähl, P. (2023). *The Influence of HEXACO Personality Traits on the Teamwork Quality in Student Software Teams — Supplementary Material*. [OSF project](https://osf.io/jb94w/overview); [original dataset download](https://osf.io/download/k4syv/).
+- [Dataset catalogue and licence attribution (CC BY 4.0)](https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/).
 
 - Study materials: https://osf.io/jb94w/overview
 - Dataset information: https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/
