@@ -16,25 +16,41 @@ course at the University of Amsterdam.
 
 ## Dataset
 
-https://osf.io/jb94w/overview                     <- explanation of variables 
+## Project structure
 
-https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/    
+- `data/` — raw questionnaire data and processed scores used by the simulation.
+- `simulated_data/` — simulation outputs, including the CSV loaded by the app.
+- `figures/` — project figures.
+- `src/` — additional analysis scripts and older copies; the current app and simulation entry points are the root-level files listed below.
+- `data_processing.R` — score the raw questionnaire data and fit the exploratory model.
+- `data_simulation.R` — run the standalone simulation using `data/processed_data.csv`.
+- `simulation_core.R` — shared team-effect and team-assignment calculations.
+- `sanity_checks.R` — quick deterministic checks for the shared simulation logic.
+- `Shiny_App.R` — current interactive app.
+- `main.Rmd` — project report.
+- `project.R` — convenience functions for running the main components.
 
-the complete dataset is there: df <- read.csv2("https://osf.io/download/k4syv/")
- 
+## Run the project
 
-HEXACO personality and teamwork dataset 
+Open `group-project.Rproj` in RStudio so the project root is the working directory. The standalone simulation requires R 4.1 or newer and the packages `dplyr`, `tidyr`, `ggplot2`, and `psych`. The analysis and app also use `tidyr`, `ggplot2`, and `shiny`.
 
-Source: Philipp Zähl (2023), supplementary research data 
+To run the analysis, use `source("data_processing.R")`. To regenerate the simulation output used by the app, use `source("data_simulation.R")`. It reads the bundled `data/processed_data.csv` and writes its CSV and PNG outputs under `simulated_data/`. The Shiny app reads `simulated_data/combined_individual_level_results.csv`; regenerate that file before running the app if you want it to reflect a new simulation.
 
 It contains personality questionnaire responses from students in software teams, along with separate measures of teamwork quality, including cohesion, communication, coordination, commitment, support, and balance.  
 
-Item Response Warehouse 
+The same entry points are available through `project.R`:
 
+```r
+source("project.R")
+analysis <- run_analysis()
+# Run only when you want to regenerate the simulation files:
+# simulation <- run_simulation()
+launch_app()
+```
 
-Useful links: 
+To knit `main.Rmd`, open it in RStudio and select **Knit**. The report runs the sanity checks and analysis; the simulation-generation chunk is disabled by default so knitting does not regenerate all outputs.
 
-- Personality data and codebook 
+## Data provenance
 
 - Teamwork quality data 
 

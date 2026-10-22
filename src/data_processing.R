@@ -78,48 +78,38 @@ df$support <- rowMeans(df[, SPRT_items], na.rm = TRUE)
 df$commitment <- rowMeans(df[, COMT_items], na.rm = TRUE)
 df$cohesion <- rowMeans(df[, COHS_items], na.rm = TRUE)
 
-# Summary table: mean and SD for HEXACO and TWQ
-vars <- c("honesty_humility", "emotionality", "extraversion", 
-          "agreeableness", "conscientiousness", "openness",
-          "communication", "coordination", "balance",
-          "support", "commitment", "cohesion")
+df$balance <- round(df$balance, 2)
+df$support <- round(df$support, 2)
 
-summary_table <- data.frame(
-  variable <- vars,
-  mean <- sapply(df[, vars], mean, na.rm = TRUE),
-  sd <- sapply(df[, vars], sd, na.rm = TRUE)
+# The six TWQ dimensions were strongly correlated (r = .46–.86),
+# and showed high internal consistency (Cronbach's alpha = .92).
+# Therefore, an overall TWQ score can be computed as their average.
+cor(df[, c("communication", "coordination", "balance",
+           "support", "commitment", "cohesion")],
+    use = "pairwise.complete.obs")
+
+psych::alpha(df[, c("communication", "coordination", "balance",
+                    "support", "commitment", "cohesion")])
+
+df$twq_overall <- rowMeans(
+  df[, c("communication", "coordination", "balance",
+         "support", "commitment", "cohesion")],
+  na.rm = TRUE
+)
+df$twq_overall <- round(df$twq_overall, 2)
+
+# Save the cleaned dataset
+keep_vars <- c(
+  "id", "Team", "TeamDuration", "TeamHours",
+  "Gender", "Age", "Degree.Program",
+  "honesty_humility", "emotionality", "extraversion",
+  "agreeableness", "conscientiousness", "openness",
+  "communication", "coordination", "balance",
+  "support", "commitment", "cohesion",
+  "twq_overall"
 )
 
-summary_table$mean <- round(summary_table$mean, 2)
-summary_table$sd <- round(summary_table$sd, 2)
-summary_table$type <- c(rep("HEXACO", 6), rep("TWQ", 6))
+df_clean <- df[, keep_vars]
 
-# correlation analysis
-cor_vars <- c("honesty_humility", "emotionality", "extraversion",
-              "agreeableness", "conscientiousness", "openness",
-              "communication", "coordination", "balance",
-              "support", "commitment", "cohesion")
-
-cor_mat <- cor(df[, cor_vars], use = "pairwise.complete.obs")
-round(cor_mat, 2)
-
-# an example of plotting
-# I chose "agreeableness" (HEXACO) and "communication" (TWQ) as an example,
-# because they showed the strongest correlation.
-library(ggplot2)
-
-ggplot(df, aes(x = agreeableness, y = communication)) +
-  geom_point(alpha = 0.6) +
-  geom_smooth(method = "lm", se = TRUE, color = "blue") +
-  labs(
-    x = "Agreebleness",
-    y = "Communication",
-    title = "Agreebleness vs Communication"
-  ) +
-  theme_classic()
-
-# also here is the example of regression.
-# regression: does agreeableness predict communication?
-model <- lm(communication ~ agreeableness, data = df)
-summary(model)
-
+write.csv(df_clean, "data/processed_data.csv", row.names = FALSE)
+write.csv(df, "data/processed_data_raw.csv", row.names = FALSE)
