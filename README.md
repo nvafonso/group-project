@@ -24,6 +24,7 @@ Shiny_App.R: The interactive application.
 figures/: Contains all generated plots.
 
 main.Rmd: The main deliverable report combining code, results, and explanations.
+
 README.md: Project instructions and overview.
 
 ## How to Run
