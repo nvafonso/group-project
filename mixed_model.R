@@ -1,4 +1,4 @@
-# Mixed-effects models for HEXACO, TWQ and TWQ_overall
+# MIXED-EFFECTS MODELS for HEXACO, TWQ and TWQ_overall
 library(lme4)
 
 df <- read.csv("processed_data.csv")
@@ -104,3 +104,34 @@ round(fixef(model_multi), 3)
 # Intercept = 2.090
 # Overall_TWQ = 2.090 + (-0.006 * H) + (-0.119 * E) + 
 # (0.130 * X) + (0.321 * A) + (0.087 * C) + (0.030 * O)
+
+# MODEL DIAGNOSTICS
+library(performance)
+library(see)
+
+# Check for Multicollinearity (VIF) in the multiple regression
+# (We want VIF < 5 to show predictors are not too highly correlated)
+cat("\n--- Check Multicollinearity (VIF) ---\n")
+print(check_collinearity(model_multi))
+# All VIF values are between 1.17 and 1.48, well below the threshold 
+# of 5. No multicollinearity issues.
+
+# Check for Singular Fit (Convergence warnings)
+# Checks if the random effect variance is too close to zero
+check_singularity(model_focused)
+check_singularity(model_multi)
+# Both models passed the singularity checks (FALSE for singular fit),
+# so the random effects are estimated well.
+
+# Check Normality and Homoscedasticity of residuals for the focused model
+check_normality(model_focused)
+check_heteroscedasticity(model_focused)
+# The residuals are normally distributed (Shapiro-Wilk p = .607)
+# and the error variance is homoscedastic (p = .830).
+
+# Generate and save Diagnostic Plots (Q-Q plot, Residuals vs Fitted, etc.)
+png("diagnostic_plots.png", width = 800, height = 800)
+par(mfrow = c(2, 2))
+plot(model_focused)
+dev.off()
+
