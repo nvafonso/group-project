@@ -1,43 +1,53 @@
 ---
 title: "Personality & Teamwork Quality Explorer"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Knit all project-relative paths from the folder containing this R Markdown file.
+project_root <- normalizePath(dirname(knitr::current_input()),
+                              winslash = "/", mustWork = TRUE)
+knitr::opts_knit$set(root.dir = project_root)
+```
 
 ## Project overview
 
-This project explores associations between HEXACO personality traits
-and teamwork quality using questionnaire data.
+This project explores associations between HEXACO personality traits and
+teamwork quality using questionnaire data.
 
-It also includes a Shiny app for exploring observed relationships and
-simulating hypothetical team-formation strategies. Simulated outcomes
-reflect assumptions, not proven effects on real teams.
+It includes an analysis of observed questionnaire data and a Shiny app for
+exploring observed relationships and comparing hypothetical team-formation
+strategies. Simulated outcomes reflect model assumptions; they are not proven
+effects or predictions for real teams.
 
 ## Data and scoring
 
-The dataset contains 54 respondents and includes personality and
-teamwork-quality questionnaire items.
-
-The scoring rules and treatment of missing responses must be checked
-against the study documentation before interpreting results.
+The observed dataset contains questionnaire responses from 54 participants.
+The raw file is stored at `data/HEXACO_TWQ_raw-data.csv`. The analysis code
+scores HEXACO and teamwork-quality dimensions from the questionnaire items.
+The reverse-scoring decisions should be checked against the original study
+documentation before interpreting the scores.
 
 ## Statistical analysis
 
-The analysis below examines the association between agreeableness
-and reported communication quality.
+The analysis below examines the association between agreeableness and reported
+communication quality. The script loads the raw data from the `data/` folder,
+creates the scores, fits the exploratory linear model, and prints its summary.
 
 ```{r analysis}
-source("data_processing.R")     # GIVES ERROR 
-#                            Warning in file(file, "rt") :
-#                            cannot open file 'data/HEXACO_TWQ_raw-data.csv': No such file or directory
-#                            Error in file(file, "rt") : cannot open the connection
-summary(model)
+source("data_processing.R")
 print(communication_plot)
 ```
 
-This analysis is exploratory. The model does not account for
-participants belonging to the same team, and the variables were
-selected after examining correlations.
-
+The model is exploratory and does not account for participants belonging to
+the same team. The sample is small, and the variables were selected after
+examining correlations. Interpret the results accordingly; observed
+associations do not establish causation.
 
 ## Simulation
 
@@ -45,39 +55,61 @@ The simulation generates hypothetical HEXACO profiles and teamwork-quality
 outcomes under different team-formation strategies. Its parameters are
 assumptions for exploration, not estimates of causal effects.
 
-The shared `simulation_core.R` file is in the project root. The standalone
-`data_simulation.R` script uses that shared logic and writes generated files
-to the simulation output folder.
+The standalone `data_simulation.R` script uses the shared
+`simulation_core.R` file in the project root. Generated files are written to
+`simulated_data/`.
 
-To generate the simulated data, run this chunk manually when needed. It is
+Run this chunk manually when you want to generate new simulation output. It is
 not run when knitting this report.
 
 ```{r generate-simulated-data, eval=FALSE}
 source("data_simulation.R")
 ```
 
+### Simulation sanity checks
+
+The project includes quick, deterministic checks for the shared simulation
+logic. They verify that Random, Balanced, and Similar assignments give every
+team the requested number of members, that Balanced and Similar have the
+expected between-team variance on a fixed example, and that setting the
+composition and diversity effects to zero removes strategy differences when
+the same residual draws are used.
+
+Run the checks from the project root, or run this chunk when knitting the
+report:
+
+```{r simulation-sanity-checks}
+source("sanity_checks.R")
+```
+
+The variance ordering is checked on a fixed example so the check is
+reproducible; a randomly generated simulation can occasionally show a
+different ordering by chance.
+
 ## Interactive app
 
-The Shiny app provides controls for exploring the observed data and
-comparing simulated team-formation strategies. To launch it from the project
-root, run:
+The Shiny app provides controls for exploring observed questionnaire data
+and comparing simulated team-formation strategies. From the project root,
+launch it with:
 
 ```{r launch-app, eval=FALSE}
 shiny::runApp("Shiny_App.R")
 ```
 
-The app uses `simulation_core.R` for shared simulation calculations. The
-`data_simulation_copy.R` file is a copy; `data_simulation.R` is the script
-documented here as the main simulation script.
+The app and standalone simulation use `simulation_core.R` for shared
+simulation calculations. `data_simulation_copy.R` is a separate copy; the
+main simulation script documented here is `data_simulation.R`.
 
 ## Project files
 
-- `data/` — questionnaire data files.
-- `figures/` — project figures.
-- `src/` — analysis code and other source files.
-- `Shiny_App.R` — interactive Shiny app.
-- `data_simulation.R` — standalone data simulation script.
+- `data/` — raw and processed questionnaire data files.
+- `figures/` — analysis figures.
+- `src/` — additional analysis and modeling scripts.
+- `data_processing.R` — scores the observed questionnaire data and fits the exploratory model.
+- `data_simulation.R` — standalone simulation script.
 - `simulation_core.R` — shared simulation functions.
+- `sanity_checks.R` — quick checks for team assignment and strategy outcomes.
+- `Shiny_App.R` — interactive Shiny app.
 - `main.Rmd` — this report.
 
 ## Limitations
@@ -91,6 +123,3 @@ assumptions and settings selected in the simulation.
 
 - Zähl, P. (2023). *The Influence of HEXACO Personality Traits on the Teamwork Quality in Student Software Teams — Supplementary Material*. [OSF project](https://osf.io/jb94w/overview); [original dataset download](https://osf.io/download/k4syv/).
 - [Dataset catalogue and licence attribution (CC BY 4.0)](https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/).
-
-- Study materials: https://osf.io/jb94w/overview
-- Dataset information: https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/
