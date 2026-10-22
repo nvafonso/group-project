@@ -1,5 +1,58 @@
 # Shared HEXACO team-effect calculations used by the standalone generator and
-# the interactive Shiny comparison. Keep this file free of app-specific code.
+# the interactive Shiny comparison. This root-level module contains
+# calculations only; it reads and writes no project files.
+
+hexaco_assign_teams <- function(person_group_trait, n_teams, team_size,
+                               random_team=NULL) {
+  if (!is.numeric(person_group_trait) || any(!is.finite(person_group_trait))) {
+    stop("person_group_trait must contain only finite numeric values.", call.=FALSE)
+  }
+  if (length(n_teams) != 1L || !is.finite(n_teams) || n_teams < 2 ||
+      n_teams != as.integer(n_teams) || length(team_size) != 1L ||
+      !is.finite(team_size) || team_size < 2 ||
+      team_size != as.integer(team_size)) {
+    stop("n_teams and team_size must be whole numbers of at least two.", call.=FALSE)
+  }
+  n_teams <- as.integer(n_teams)
+  team_size <- as.integer(team_size)
+  n_people <- n_teams * team_size
+  if (length(person_group_trait) != n_people) {
+    stop("The trait vector length must equal n_teams * team_size.", call.=FALSE)
+  }
+
+  validate_assignment <- function(team_id, label) {
+    if (length(team_id) != n_people || anyNA(team_id) ||
+        any(!team_id %in% seq_len(n_teams)) ||
+        any(tabulate(as.integer(team_id), nbins=n_teams) != team_size)) {
+      stop(label, " assignment must give every team exactly team_size members.",
+           call.=FALSE)
+    }
+    as.integer(team_id)
+  }
+
+  if (is.null(random_team)) {
+    random_team <- sample(rep(seq_len(n_teams), each=team_size))
+  }
+  random_team <- validate_assignment(random_team, "Random")
+
+  # Similar-score assignment puts adjacent sorted scores together.
+  ord <- order(person_group_trait)
+  similar_team <- integer(n_people)
+  similar_team[ord] <- rep(seq_len(n_teams), each=team_size)
+
+  # Balanced assignment alternates sorted scores across teams in a snake pattern.
+  balanced_team <- integer(n_people)
+  for (k in seq_len(n_people)) {
+    row <- (k - 1L) %/% n_teams
+    col <- (k - 1L) %% n_teams
+    if (row %% 2L == 1L) col <- n_teams - 1L - col
+    balanced_team[ord[k]] <- col + 1L
+  }
+
+  result <- list(Random=random_team, Balanced=balanced_team, Similar=similar_team)
+  for (label in names(result)) result[[label]] <- validate_assignment(result[[label]], label)
+  result
+}
 
 hexaco_team_trait_components <- function(
     people,
