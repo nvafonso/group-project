@@ -1,7 +1,10 @@
-# Shared HEXACO team-effect calculations used by the standalone generator and
-# the interactive Shiny comparison. This root-level module contains
-# calculations only; it reads and writes no project files.
+# Shared calculations for the standalone data generator and interactive Shiny
+# comparison. This file defines functions only: it does not read or write data.
 
+# Assign people to equal-sized teams under three grouping strategies.
+# `person_group_trait` is the selected trait score for each person. The optional
+# `random_team` argument lets checks supply a fixed allocation for reproducible
+# comparisons; otherwise a random equal-sized allocation is drawn.
 hexaco_assign_teams <- function(person_group_trait, n_teams, team_size,
                                random_team=NULL) {
   if (!is.numeric(person_group_trait) || any(!is.finite(person_group_trait))) {
@@ -20,6 +23,7 @@ hexaco_assign_teams <- function(person_group_trait, n_teams, team_size,
     stop("The trait vector length must equal n_teams * team_size.", call.=FALSE)
   }
 
+  # Guard against missing, invalid, or uneven assignments before using them.
   validate_assignment <- function(team_id, label) {
     if (length(team_id) != n_people || anyNA(team_id) ||
         any(!team_id %in% seq_len(n_teams)) ||
@@ -35,12 +39,14 @@ hexaco_assign_teams <- function(person_group_trait, n_teams, team_size,
   }
   random_team <- validate_assignment(random_team, "Random")
 
-  # Similar-score assignment puts adjacent sorted scores together.
+  # Similar groups adjacent people in sorted score order, producing teams with
+  # relatively similar scores on the selected trait.
   ord <- order(person_group_trait)
   similar_team <- integer(n_people)
   similar_team[ord] <- rep(seq_len(n_teams), each=team_size)
 
-  # Balanced assignment alternates sorted scores across teams in a snake pattern.
+  # Balanced deals sorted scores across teams in a snake pattern. Reversing the
+  # order on every other pass spreads both low and high scores across teams.
   balanced_team <- integer(n_people)
   for (k in seq_len(n_people)) {
     row <- (k - 1L) %/% n_teams
@@ -49,11 +55,17 @@ hexaco_assign_teams <- function(person_group_trait, n_teams, team_size,
     balanced_team[ord[k]] <- col + 1L
   }
 
+  # Keep a consistent strategy order for downstream tables and plots.
   result <- list(Random=random_team, Balanced=balanced_team, Similar=similar_team)
   for (label in names(result)) result[[label]] <- validate_assignment(result[[label]], label)
   result
 }
 
+# Calculate the individual, team-composition, and within-team-diversity trait
+# terms for an existing team assignment.
+#
+# The `*_reference_*` vectors define fixed means and SDs used to standardize
+# scores. They must be named by trait so every column uses the intended scale.
 hexaco_team_trait_components <- function(
     people,
     team_ids,
@@ -72,6 +84,7 @@ hexaco_team_trait_components <- function(
     stop("team_ids must provide one non-empty identifier per person.", call.=FALSE)
   }
 
+  # Validate each reference vector once, then reorder it to match `traits`.
   validate_reference <- function(x, label, positive=FALSE) {
     if (is.null(names(x)) || anyDuplicated(names(x)) ||
         !setequal(names(x), traits) || !is.numeric(x) ||
@@ -100,6 +113,8 @@ hexaco_team_trait_components <- function(
     stop("All selected trait values must be numeric and finite.", call.=FALSE)
   }
 
+  # Convert team labels to stable row indices so team summaries can be
+  # calculated regardless of whether IDs were numbers, text, or factors.
   group_labels <- as.character(team_ids)
   if (is.numeric(team_ids)) {
     group_levels <- as.character(sort(unique(team_ids)))
@@ -114,6 +129,7 @@ hexaco_team_trait_components <- function(
     stop("Every team must contain at least two people to calculate within-team SD.", call.=FALSE)
   }
 
+  # Summarize each team's average trait score and within-team SD.
   team_means <- do.call(rbind, lapply(group_rows, function(rows) {
     colMeans(trait_matrix[rows, , drop=FALSE])
   }))
@@ -123,6 +139,8 @@ hexaco_team_trait_components <- function(
   colnames(team_means) <- colnames(team_sds) <- traits
   rownames(team_means) <- rownames(team_sds) <- group_levels
 
+  # Standardize team averages and team SDs against the supplied fixed
+  # references, rather than re-centering separately within each strategy.
   team_mean_z <- sweep(
     sweep(team_means, 2, trait_reference_means, "-"),
     2, trait_reference_sds, "/"
@@ -131,6 +149,9 @@ hexaco_team_trait_components <- function(
     sweep(team_sds, 2, diversity_reference_means, "-"),
     2, diversity_reference_sds, "/"
   )
+  # Expand each team's values back to person rows. The individual term is the
+  # person's deviation from their own team's mean, standardized on the same
+  # reference scale; it separates individual differences from team context.
   person_team_mean_z <- team_mean_z[group_index, , drop=FALSE]
   person_diversity_z <- diversity_z[group_index, , drop=FALSE]
   individual_z <- sweep(
@@ -138,6 +159,8 @@ hexaco_team_trait_components <- function(
     2, trait_reference_sds, "/"
   ) - person_team_mean_z
 
+  # Return both team-level and person-level forms for the two simulation
+  # workflows, which use these components at different stages.
   list(
     group_levels=group_levels,
     group_index=group_index,
@@ -153,6 +176,10 @@ hexaco_team_trait_components <- function(
   )
 }
 
+# Add the modeled pieces of a continuous latent outcome. Callers can provide
+# vectors for person- or team-specific effects and noise; values must be
+# scalars or have the same length. Any conversion to bounded or ordinal scores
+# happens later in the calling simulation.
 hexaco_compose_latent_score <- function(
     intercept,
     individual_component=0,
@@ -172,6 +199,8 @@ hexaco_compose_latent_score <- function(
   if (any(!lengths(components) %in% c(1L, n))) {
     stop("Score components must have length one or the same length.", call.=FALSE)
   }
+  # R recycles scalar terms across rows; all longer terms were checked to have
+  # the same length above.
   intercept + individual_component + composition_component +
     diversity_component + team_component + residual
 }
