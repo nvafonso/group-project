@@ -1,16 +1,39 @@
-# Raw data provenance
 
-`HEXACO_TWQ_raw-data.csv` is an unchanged copy of the file uploaded for this group
-project: 54 rows, 105 columns, semicolon-separated, with participant and team IDs.
+# HEXACO Personality & Teamwork Quality Explorer
 
-Source: Zähl, P. (2023). The Influence of HEXACO Personality Traits on the Teamwork
-Quality in Student Software Teams — Supplementary Material. OSF.
-https://osf.io/jb94w/
-Original download: https://osf.io/download/k4syv/
-Catalogue and licence attribution (CC BY 4.0):
-https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/
+## Project Description
+This project explores the relationship between HEXACO personality traits and teamwork quality using questionnaire data from student software teams (N = 54). It includes a comprehensive statistical analysis (correlations and mixed-effects models) and an interactive Shiny application that allows users to explore observed relationships and simulate hypothetical team-formation strategies.
 
-No questionnaire values were changed in the raw file. Scores are calculated at run
-time. The supplied code assumes the columns marked r still require reversing.
-The analysis author must verify this against the original questionnaire before
-interpreting results. Do not reverse already-scored data a second time.
+## Dependencies
+To run this project, you need R (version 4.0 or higher) and the following packages. You can install them using:
+```R
+install.packages(c("shiny", "ggplot2", "dplyr", "tidyr", "lme4", "broom.mixed", "performance", "reshape2", "psych"))
+```
+
+## Repository Structure
+
+data/: Contains the raw and processed datasets.
+
+src/: Contains R scripts.
+data_processing.R: Cleans data and computes scale scores.
+data_analysis.R: Descriptives, correlations, and plots.
+mixed_model.R: Linear mixed-effects models and diagnostics.
+data_simulation.R: Functions for the Shiny app simulation.
+Shiny_App.R: The interactive application.
+
+figures/: Contains all generated plots.
+
+main.Rmd: The main deliverable report combining code, results, and explanations.
+README.md: Project instructions and overview.
+
+## How to Run
+
+Clone this repository to your local machine.
+Open group-project.Rproj in RStudio to set the working directory correctly.
+To view the report: Open main.Rmd and click the "Knit" button to generate the full HTML report.
+To run the Shiny App: Open src/Shiny_App.R and click "Run App" (or run shiny::runApp("src/Shiny_App.R") in the console).
+
+## References
+Zähl, P., Theis, S., & Wolf, M. R. (2023). HEXACO personality and teamwork dataset.
+Ashton, M. C., & Lee, K. (2009). The HEXACO-60: A short measure of the major dimensions of personality. Journal of Personality Assessment.
+Hoegl, M., & Gemuenden, H. G. (2001). Teamwork quality and the success of innovative projects. Organization Science.
