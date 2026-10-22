@@ -19,8 +19,8 @@
 # Teamwork outcomes are generated from latent scores and converted to
 # ordinal 1-5 questionnaire responses using response thresholds. Subscale
 # scores are the means of their scored items; overall TWQ is the mean of the
-# six subscale scores. Thresholds and item noise are placeholders until
-# raw questionnaire response data are available.
+# six subscale scores. Trait effects and ordinal measurement settings remain
+# explicit assumptions; descriptive population inputs come from processed data.
 #
 # Requires R >= 4.1 and packages: dplyr, tidyr, ggplot2
 # ============================================================
@@ -50,17 +50,11 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(ggplot2)
 })
-simulation_core_candidates <- c(
-  "simulation_core.R",
-  file.path("src", "simulation_core.R"),
-  file.path("outputs", "simulation_core.R"),
-  file.path("..", "src", "simulation_core.R")
-)
-simulation_core_path <- simulation_core_candidates[file.exists(simulation_core_candidates)]
-if (!length(simulation_core_path)) {
-  stop("Shared simulation_core.R was not found beside this script, in src/, or in outputs/.", call.=FALSE)
+simulation_core_path <- "simulation_core.R"
+if (!file.exists(simulation_core_path)) {
+  stop("simulation_core.R was not found in the project root. Run data_simulation.R from the project folder.", call.=FALSE)
 }
-source(simulation_core_path[[1]], local=TRUE)
+source(simulation_core_path, local=TRUE)
 run_started_at <- Sys.time()
 
 # ------------------------------------------------------------
@@ -93,33 +87,144 @@ twq_items <- list(
 twq_reverse_items <- c("CMNC04", "CMNC06", "CMNC07", "CRDN4",
                        "BLNC3", "COMT4", "COHS02", "COHS06")
 
-# Ordinal measurement assumptions (latent scale centered near 3).
-# Change thresholds to match observed category frequencies when available.
+# The processed scale scores provide empirical descriptive inputs. They do not
+# identify causal trait effects or a latent ordinal measurement model, so the
+# effect coefficients, response thresholds, and item-noise setting below
+# remain explicit simulation assumptions.
 twq_response_thresholds <- c(-1.20, -0.40, 0.40, 1.20)
 twq_item_noise_sd <- 0.70
 
-# Placeholder outcome correlations, expressed through different latent
-# common-factor loadings at the team and individual levels. These create
-# stronger relationships for conceptually closer domains. Replace with
-# estimates from real data when available. Outcome order follows twq_outcomes.
-team_outcome_loadings <- c(
-  communication = 0.72, coordination = 0.78, balance = 0.55,
-  support = 0.70, commitment = 0.62, cohesion = 0.80
-)
-individual_residual_loadings <- c(
-  communication = 0.56, coordination = 0.63, balance = 0.42,
-  support = 0.60, commitment = 0.50, cohesion = 0.66
-)
-make_loading_correlation <- function(loadings) {
-  correlation <- tcrossprod(loadings)
-  diag(correlation) <- 1
-  dimnames(correlation) <- list(names(loadings), names(loadings))
-  correlation
+processed_data_path <- file.path("data", "processed_data.csv")
+if (!file.exists(processed_data_path)) {
+  stop("Could not find data/processed_data.csv. Run the project's data processing script first.",
+       call. = FALSE)
 }
-team_outcome_correlation_matrix <- make_loading_correlation(team_outcome_loadings)
-individual_residual_correlation_matrix <- make_loading_correlation(
-  individual_residual_loadings
+processed_data <- read.csv(processed_data_path, check.names = FALSE,
+                           stringsAsFactors = FALSE)
+required_processed_columns <- c("Team", hexaco_traits, twq_outcomes)
+missing_processed_columns <- setdiff(required_processed_columns, names(processed_data))
+if (length(missing_processed_columns)) {
+  stop("Processed data is missing required columns: ",
+       paste(missing_processed_columns, collapse = ", "), call. = FALSE)
+}
+for (score_name in c(hexaco_traits, twq_outcomes)) {
+  if (!is.numeric(processed_data[[score_name]])) {
+    stop("Processed score column must be numeric: ", score_name, call. = FALSE)
+  }
+}
+if (anyNA(processed_data$Team) ||
+    any(!nzchar(trimws(as.character(processed_data$Team))))) {
+  stop("Processed data must contain a non-empty Team identifier for every participant.",
+       call. = FALSE)
+}
+
+trait_data <- processed_data[
+  complete.cases(processed_data[, c("Team", hexaco_traits), drop = FALSE]),
+  c("Team", hexaco_traits), drop = FALSE
+]
+outcome_data <- processed_data[
+  complete.cases(processed_data[, c("Team", twq_outcomes), drop = FALSE]),
+  c("Team", twq_outcomes), drop = FALSE
+]
+if (nrow(trait_data) < 3L || nrow(outcome_data) < 3L) {
+  stop("At least three complete participants are required to estimate the processed-data inputs.",
+       call. = FALSE)
+}
+
+regularize_correlation <- function(x, label) {
+  x <- as.matrix(x)
+  if (any(!is.finite(x))) {
+    stop(label, " contains non-finite values; check the processed data.", call. = FALSE)
+  }
+  x <- (x + t(x)) / 2
+  diag(x) <- 1
+  minimum_eigenvalue <- min(eigen(x, symmetric = TRUE, only.values = TRUE)$values)
+  shrinkage <- if (minimum_eigenvalue <= 1e-6) {
+    (1e-6 - minimum_eigenvalue) / (1 - minimum_eigenvalue)
+  } else {
+    0
+  }
+  if (shrinkage > 0) x <- (1 - shrinkage) * x + shrinkage * diag(nrow(x))
+  list(matrix = x, shrinkage = shrinkage)
+}
+
+trait_reference_means <- setNames(colMeans(trait_data[hexaco_traits]), hexaco_traits)
+trait_reference_sds <- setNames(
+  vapply(trait_data[hexaco_traits], stats::sd, numeric(1)), hexaco_traits
 )
+trait_correlation_estimate <- regularize_correlation(
+  stats::cor(trait_data[hexaco_traits]), "HEXACO trait correlation matrix"
+)
+hexaco_correlation_matrix <- trait_correlation_estimate$matrix
+
+team_trait_means <- aggregate(
+  trait_data[hexaco_traits], list(Team = trait_data$Team), mean
+)
+
+# A within-team SD cannot be estimated for a singleton team. Keep all teams
+# when estimating team-mean variation, but use teams with at least two
+# participants to calibrate the diversity reference.
+team_sizes <- table(trait_data$Team)
+diversity_reference_teams <- names(team_sizes[team_sizes >= 2L])
+team_trait_sds <- aggregate(
+  trait_data[trait_data$Team %in% diversity_reference_teams, hexaco_traits, drop = FALSE],
+  list(Team = trait_data$Team[trait_data$Team %in% diversity_reference_teams]),
+  stats::sd
+)
+if (nrow(team_trait_means) < 2L || length(diversity_reference_teams) < 2L ||
+    any(!is.finite(trait_reference_sds)) || any(trait_reference_sds <= 0) ||
+    any(!is.finite(as.matrix(team_trait_sds[hexaco_traits])))) {
+  stop("Processed data needs at least two teams with multiple participants and variation in every HEXACO trait.",
+       call. = FALSE)
+}
+if (length(diversity_reference_teams) < length(team_sizes)) {
+  warning(
+    sum(team_sizes < 2L),
+    " singleton team(s) excluded from within-team HEXACO diversity calibration.",
+    call. = FALSE
+  )
+}
+observed_team_mean_sds <- setNames(
+  vapply(team_trait_means[hexaco_traits], stats::sd, numeric(1)), hexaco_traits
+)
+team_mean_sd <- sqrt(mean(observed_team_mean_sds^2))
+default_diversity_reference <- setNames(
+  vapply(team_trait_sds[hexaco_traits], mean, numeric(1)), hexaco_traits
+)
+
+outcome_intercepts <- setNames(colMeans(outcome_data[twq_outcomes]), twq_outcomes)
+team_outcome_means <- aggregate(
+  outcome_data[twq_outcomes], list(Team = outcome_data$Team), mean
+)
+if (nrow(team_outcome_means) < 2L) {
+  stop("Processed outcome data needs at least two teams.", call. = FALSE)
+}
+team_outcome_sds <- setNames(
+  vapply(team_outcome_means[twq_outcomes], stats::sd, numeric(1)), twq_outcomes
+)
+within_team_outcome_residuals <- as.data.frame(lapply(twq_outcomes, function(outcome) {
+  outcome_data[[outcome]] - ave(outcome_data[[outcome]], outcome_data$Team, FUN = mean)
+}), check.names = FALSE)
+names(within_team_outcome_residuals) <- twq_outcomes
+individual_residual_sds <- setNames(
+  vapply(within_team_outcome_residuals, stats::sd, numeric(1)), twq_outcomes
+)
+team_correlation_estimate <- regularize_correlation(
+  stats::cor(team_outcome_means[twq_outcomes]), "Between-team outcome correlation matrix"
+)
+residual_correlation_estimate <- regularize_correlation(
+  stats::cor(within_team_outcome_residuals), "Within-team outcome correlation matrix"
+)
+team_outcome_correlation_matrix <- team_correlation_estimate$matrix
+individual_residual_correlation_matrix <- residual_correlation_estimate$matrix
+team_random_sd <- mean(team_outcome_sds)
+individual_noise_sd <- mean(individual_residual_sds)
+processed_team_count <- length(unique(outcome_data$Team))
+if (processed_team_count < 20L) {
+  warning(sprintf("Between-team covariance estimates use only %d observed teams and may be unstable.", processed_team_count), call. = FALSE)
+}
+trait_complete_n <- nrow(trait_data)
+outcome_complete_n <- nrow(outcome_data)
 
 trait_labels <- c(
   honesty_humility = "Honesty–Humility",
@@ -140,30 +245,7 @@ outcome_labels <- c(
   twq_overall = "Overall teamwork quality"
 )
 
-# Population reference values used to standardize individual traits.
-# Effects are interpreted as score-point change per 1 reference SD.
-trait_reference_means <- setNames(rep(3, length(hexaco_traits)), hexaco_traits)
-trait_reference_sds <- setNames(rep(0.7, length(hexaco_traits)), hexaco_traits)
-
-# Temporary placeholder correlations between HEXACO traits. These values are
-# taken from the community sample in Ashton & Lee (2009), Table 3 (N = 734),
-# not from the real dataset for this project. Replace this matrix when
-# project-specific estimates are available. Rows and columns must follow
-# hexaco_traits order.
-hexaco_correlation_matrix <- matrix(
-  c(
-    1.00,  0.04, -0.09,  0.25,  0.13, -0.03,
-    0.04,  1.00, -0.07, -0.04, -0.06, -0.08,
-   -0.09, -0.07,  1.00, -0.11, -0.13,  0.00,
-    0.25, -0.04, -0.11,  1.00,  0.05, -0.05,
-    0.13, -0.06, -0.13,  0.05,  1.00,  0.09,
-   -0.03, -0.08,  0.00, -0.05,  0.09,  1.00
-  ),
-  nrow = length(hexaco_traits),
-  byrow = TRUE,
-  dimnames = list(hexaco_traits, hexaco_traits)
-)
-
+# Effect coefficients below remain illustrative assumptions, expressed in score points per one processed-data reference SD.
 # Illustrative direct individual-level effects (outcome score points
 # per 1 reference SD of the named trait). These are deliberately
 # non-zero so changing the assumptions changes the model output.
@@ -241,11 +323,10 @@ default_diversity_effects <- diversity_effect_table_to_list(
   default_diversity_effects_table
 )
 
-outcome_intercepts <- setNames(rep(3, length(twq_outcomes)), twq_outcomes)
-default_diversity_reference <- setNames(rep(0.30, length(hexaco_traits)), hexaco_traits)
 
-# Central configuration for the complete run. Edit assumptions here so the
-# run metadata and manifest can record the exact settings used.
+# Central configuration for the complete run. Population summaries are read
+# from data/processed_data.csv; causal and measurement settings below remain
+# explicit assumptions. The run metadata records both inputs and assumptions.
 simulation_config <- list(
   design = list(
     n_teams = 500L,
@@ -257,7 +338,7 @@ simulation_config <- list(
     trait_means = trait_reference_means,
     trait_reference_sds = trait_reference_sds,
     hexaco_correlation = hexaco_correlation_matrix,
-    team_mean_sd = 0.35
+    team_mean_sd = team_mean_sd
   ),
   effects = list(
     individual = default_trait_effects,
@@ -267,10 +348,10 @@ simulation_config <- list(
     diversity_reference = default_diversity_reference
   ),
   outcome = list(
-    team_sd = 0.25,
-    residual_sd = 0.45,
-    team_sds = setNames(rep(0.25, length(twq_outcomes)), twq_outcomes),
-    residual_sds = setNames(rep(0.45, length(twq_outcomes)), twq_outcomes),
+    team_sd = team_random_sd,
+    residual_sd = individual_noise_sd,
+    team_sds = team_outcome_sds,
+    residual_sds = individual_residual_sds,
     team_correlations = team_outcome_correlation_matrix,
     residual_correlations = individual_residual_correlation_matrix,
     item_noise_sd = twq_item_noise_sd,
@@ -644,10 +725,10 @@ simulate_teamwork_with_diversity <- function(
   if (is.null(diversity_effects)) diversity_effects <- default_diversity_effects
   if (is.null(diversity_reference)) diversity_reference <- default_diversity_reference
   if (is.null(trait_reference_means)) {
-    trait_reference_means <- setNames(rep(3, length(hexaco_traits)), hexaco_traits)
+    trait_reference_means <- simulation_config$population$trait_means
   }
   if (is.null(trait_reference_sds)) {
-    trait_reference_sds <- setNames(rep(0.7, length(hexaco_traits)), hexaco_traits)
+    trait_reference_sds <- simulation_config$population$trait_reference_sds
   }
 
   scalar_nonnegative <- function(x, label) {
@@ -1023,7 +1104,7 @@ trait_score_diagnostics <- combined_results |>
     across(where(is.numeric), ~ round(.x, 4))
   )
 
-# Compare the placeholder/input correlation assumptions with the correlations
+# Compare the processed-data correlation inputs with the correlations
 # actually present in the bounded simulated scores for each scenario.
 observed_hexaco_correlations <- bind_rows(lapply(
   unique(combined_results$Scenario),
@@ -1722,7 +1803,9 @@ run_metadata <- data.frame(
     "main_outcome_seed", "dose_response_team_seed", "dose_response_outcome_seed",
     "sensitivity_team_seed", "sensitivity_outcome_seed", "pairing_strategy",
     "sensitivity_stream_strategy", "primary_teams_per_scenario", "team_size",
-    "low_target_sd", "high_target_sd", "team_mean_sd", "output_directory"
+    "low_target_sd", "high_target_sd", "team_mean_sd", "processed_data_file",
+    "processed_trait_n", "processed_outcome_n", "processed_team_n",
+    "team_correlation_shrinkage", "residual_correlation_shrinkage", "output_directory"
   ),
   value = c(
     format(run_started_at, tz = "UTC", usetz = TRUE), R.version.string,
@@ -1734,6 +1817,8 @@ run_metadata <- data.frame(
     "Low/high share generation and outcome seeds; paired by team/member ID",
     "Separate seed stream from primary run; common draws across sensitivity settings",
     n_teams, team_size, low_target_sd, high_target_sd, team_mean_sd,
+    processed_data_path, trait_complete_n, outcome_complete_n, processed_team_count,
+    team_correlation_estimate$shrinkage, residual_correlation_estimate$shrinkage,
     normalizePath(output_dir, winslash = "/", mustWork = FALSE)
   ),
   stringsAsFactors = FALSE
@@ -1880,7 +1965,8 @@ cat(
   "Output folder: ", normalizePath(output_dir, winslash = "/", mustWork = FALSE), "\n",
   "Scenarios: ", n_teams, " teams x ", team_size,
   " members = ", n_teams * team_size, " participants per scenario.\n",
-  "All reported effects are hypothetical assumptions.\n",
+  "Empirical reference inputs: ", trait_complete_n, " participants and ", processed_team_count, " teams from ", processed_data_path, ".\n",
+  "Trait and diversity effects and ordinal measurement settings remain assumptions.\n",
   sep = ""
 )
 
@@ -1924,7 +2010,8 @@ manifest_assumptions <- paste0(
   "; target_sd_low/high=", low_target_sd, "/", high_target_sd,
   "; team_mean_sd=", team_mean_sd,
   "; team/residual SD=", team_random_sd, "/", individual_noise_sd,
-  "; correlation matrices and personality/diversity coefficients are illustrative",
+  "; population summaries and correlation matrices are estimated from processed_data.csv",
+  "; trait/diversity coefficients and ordinal measurement settings remain assumptions",
   "; low/high use paired seeds; sensitivity uses an independent stream with ",
   length(sensitivity_specs), " one-at-a-time settings; full assumptions in simulation_config.rds"
 )
