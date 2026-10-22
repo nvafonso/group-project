@@ -15,6 +15,13 @@ project_root <- normalizePath(dirname(knitr::current_input()),
 knitr::opts_knit$set(root.dir = project_root)
 ```
 
+
+```{r install-packages, eval=FALSE}
+install.packages(c(
+  "rmarkdown", "knitr", "dplyr", "tidyr", "ggplot2", "reshape2",
+  "shiny", "psych"
+))
+```
 ## Project overview
 
 This project explores associations between HEXACO personality traits and
