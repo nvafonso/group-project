@@ -37,7 +37,7 @@ effects or predictions for real teams.
 The observed dataset contains questionnaire responses from 54 participants.
 The raw file is stored at `data/HEXACO_TWQ_raw-data.csv`. The processing code
 scores HEXACO and teamwork-quality dimensions from questionnaire items. The
-`src/data_processing.R` script also creates the processed file used by the
+`data_processing.R` script also creates the processed file used by the
 standalone simulation. That script currently downloads the source data from
 OSF, so processing it requires an internet connection.
 
