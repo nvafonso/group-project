@@ -3,6 +3,7 @@
 
 source("simulation_core.R")
 
+# Set up a small example with 4 teams of 6 people each (24 people total).
 n_teams <- 4L
 team_size <- 6L
 trait <- seq_len(n_teams * team_size)
