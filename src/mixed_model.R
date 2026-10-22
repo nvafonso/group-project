@@ -1,7 +1,7 @@
 # MIXED-EFFECTS MODELS for HEXACO, TWQ and TWQ_overall
 library(lme4)
 
-df <- read.csv("processed_data.csv")
+df <- read.csv("data/processed_data.csv")
 
 # Focused Mixed-Effects Model
 # Reason for choosing these variables: 
@@ -78,7 +78,7 @@ library(broom.mixed)
 # indicating it is the only significant positive predictor.
 
 tidy(model_multi, conf.int = TRUE) %>%
-  filter(term != "(Intercept)") %>%
+  filter(!grepl("sd__|(Intercept)", term)) %>%
   ggplot(aes(x = estimate, y = reorder(term, estimate))) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2, color = "#28778D", linewidth = 1) +
@@ -91,10 +91,10 @@ tidy(model_multi, conf.int = TRUE) %>%
   ) +
   theme_classic(base_size = 14)
 
-ggsave("forest_plot.png")
+ggsave("figures/forest_plot.png", width = 8, height = 6)
 
-saveRDS(model_focused, "model_focused.rds")
-saveRDS(model_multi, "model_multi.rds")
+saveRDS(model_focused, "src/model_focused.rds")
+saveRDS(model_multi, "src/model_multi.rds")
 
 round(fixef(model_focused), 3)
 # Intercept = 1.967
@@ -130,8 +130,7 @@ check_heteroscedasticity(model_focused)
 # and the error variance is homoscedastic (p = .830).
 
 # Generate and save Diagnostic Plots (Q-Q plot, Residuals vs Fitted, etc.)
-png("diagnostic_plots.png", width = 800, height = 800)
+png("figures/diagnostic_plots.png", width = 800, height = 800)
 par(mfrow = c(2, 2))
 plot(model_focused)
 dev.off()
-

@@ -4,7 +4,7 @@
 # Correlation analysis (matrix and heatmap)
 # Scatterplots with regression lines
 
-df <- read.csv("processed_data.csv")
+df <- read.csv("data/processed_data.csv")
 
 # Summary table: mean and SD for HEXACO and TWQ
 vars <- c("honesty_humility", "emotionality", "extraversion", 
@@ -33,10 +33,17 @@ df %>%
   ggplot(aes(x = value)) +
   geom_histogram(bins = 15, fill = "#28778D", color = "white") +
   facet_wrap(~ variable, scales = "free") +
-  theme_minimal() +
+  theme(axis.title.y = element_blank(),      
+        axis.text.y = element_blank(),       
+        axis.ticks.y = element_blank(),      
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        strip.text = element_text(size = 12, face = "bold")
+  ) +
   labs(title = "Distributions of HEXACO and TWQ scores")
 
-ggsave("Distributions of HEXACO and TWQ scores.png")
+ggsave("figures/Distributions of HEXACO and TWQ scores.png", 
+       width = 12, height = 8, dpi = 300)
 
 # correlation analysis for every dimension
 cor_vars <- c("honesty_humility", "emotionality", "extraversion",
@@ -74,9 +81,10 @@ melt(cor_mat) %>%
                        midpoint = 0) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x = "", y = "", fill = "r")
+  labs(x = "", y = "", fill = "r", 
+       title = "Correlation Matrix of HEXACO Traits and Teamwork Quality")
 
-ggsave("plot_heatmap.png")
+ggsave("figures/plot_heatmap.png", width = 10, height = 8, dpi = 300)
 
 # "agreeableness" (HEXACO) with "support" and "communication" (TWQ)
 # showed the strongest correlation (r = 0.38 / 0.36).
@@ -95,7 +103,7 @@ ggplot(df_long, aes(x = agreeableness, y = twq_score)) +
        title = "Agreeableness vs TWQ dimensions") +
   theme_classic()
 
-ggsave("plot_scatter_agreeableness.png")
+ggsave("figures/plot_scatter_agreeableness.png")
 
 # Each HEXACO trait vs overall teamwork quality.
 # Emotionality shows a negative association with teamwork quality.
@@ -118,4 +126,4 @@ ggplot(df_long_overall, aes(x = trait_score, y = twq_overall)) +
   ) +
   theme_classic()
 
-ggsave("plot_scatter_overall.png")
+ggsave("figures/plot_scatter_overall.png")
