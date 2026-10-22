@@ -1,125 +1,148 @@
 ---
 title: "Personality & Teamwork Quality Explorer"
-output:
-  html_document:
-    toc: true
-    toc_depth: 2
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-
-# Knit all project-relative paths from the folder containing this R Markdown file.
-project_root <- normalizePath(dirname(knitr::current_input()),
-                              winslash = "/", mustWork = TRUE)
-knitr::opts_knit$set(root.dir = project_root)
+knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
+dir.create("figures", showWarnings = FALSE)
 ```
 
 ## Project overview
 
-This project explores associations between HEXACO personality traits and
-teamwork quality using questionnaire data.
+This project explores associations between HEXACO personality traits
+and reported teamwork quality. It also includes an interactive Shiny
+app and hypothetical simulations.
 
-It includes an analysis of observed questionnaire data and a Shiny app for
-exploring observed relationships and comparing hypothetical team-formation
-strategies. Simulated outcomes reflect model assumptions; they are not proven
-effects or predictions for real teams.
+Simulated outcomes depend on assumptions and do not establish that
+a team-formation strategy improves teamwork in practice.
 
 ## Data and scoring
 
-The observed dataset contains questionnaire responses from 54 participants.
-The raw file is stored at `data/HEXACO_TWQ_raw-data.csv`. The analysis code
-scores HEXACO and teamwork-quality dimensions from the questionnaire items.
-The reverse-scoring decisions should be checked against the original study
-documentation before interpreting the scores.
+The questionnaire dataset contains 54 respondents from student teams.
+The processing script calculates six HEXACO scores, six teamwork
+quality scores, and an overall teamwork quality score.
 
-## Statistical analysis
+The processing script currently downloads the source data from OSF,
+so this step requires an internet connection.
 
-The analysis below examines the association between agreeableness and reported
-communication quality. The script loads the raw data from the `data/` folder,
-creates the scores, fits the exploratory linear model, and prints its summary.
+```{r processing}
+source("src/data_processing.R")
+```
+
+## Descriptive statistics and relationships
 
 ```{r analysis}
-source("data_processing.R")
-print(communication_plot)
+source("src/data_analysis.R")
+knitr::kable(summary_table, row.names = FALSE)
 ```
 
-The model is exploratory and does not account for participants belonging to
-the same team. The sample is small, and the variables were selected after
-examining correlations. Interpret the results accordingly; observed
-associations do not establish causation.
-
-## Simulation
-
-The simulation generates hypothetical HEXACO profiles and teamwork-quality
-outcomes under different team-formation strategies. Its parameters are
-assumptions for exploration, not estimates of causal effects.
-
-The standalone `data_simulation.R` script uses the shared
-`simulation_core.R` file in the project root. Generated files are written to
-`simulated_data/`.
-
-Run this chunk manually when you want to generate new simulation output. It is
-not run when knitting this report.
-
-```{r generate-simulated-data, eval=FALSE}
-source("data_simulation.R")
+```{r heatmap, out.width="100%"}
+knitr::include_graphics("figures/plot_heatmap.png")
 ```
 
-### Simulation sanity checks
+The observed correlation between agreeableness and support is
+`r round(cor(df$agreeableness, df$support, use = "complete.obs"), 2)`.
+These correlations describe associations, not causal effects.
 
-The project includes quick, deterministic checks for the shared simulation
-logic. They verify that Random, Balanced, and Similar assignments give every
-team the requested number of members, that Balanced and Similar have the
-expected between-team variance on a fixed example, and that setting the
-composition and diversity effects to zero removes strategy differences when
-the same residual draws are used.
-
-Run the checks from the project root, or run this chunk when knitting the
-report:
-
-```{r simulation-sanity-checks}
-source("sanity_checks.R")
+```{r scatterplots, out.width="100%"}
+knitr::include_graphics("figures/plot_scatter_agreeableness.png")
 ```
 
-The variance ordering is checked on a fixed example so the check is
-reproducible; a randomly generated simulation can occasionally show a
-different ordering by chance.
+## Mixed-effects models
+
+Both models include a random intercept for team to account for
+participants belonging to the same team. The focused model examines
+support and agreeableness. The second model examines overall teamwork
+quality using all six personality traits.
+
+```{r models}
+source("src/mixed_model.R")
+summary(model_focused)
+summary(model_multi)
+```
+
+In the focused model, a one-point increase in agreeableness is associated
+with an estimated `r round(lme4::fixef(model_focused)["agreeableness"], 3)`
+point difference in support.
+
+The focused relationship was selected after examining correlations,
+so its interpretation is exploratory.
+
+```{r forest, out.width="100%"}
+knitr::include_graphics("figures/forest_plot.png")
+```
+
+## Model diagnostics
+
+```{r diagnostics}
+performance::check_collinearity(model_multi)
+
+data.frame(
+  model = c("Focused support", "Six-trait overall teamwork"),
+  singular_fit = c(
+    lme4::isSingular(model_focused),
+    lme4::isSingular(model_multi)
+  )
+)
+
+performance::check_normality(model_focused)
+performance::check_heteroscedasticity(model_focused)
+performance::check_normality(model_multi)
+performance::check_heteroscedasticity(model_multi)
+```
+
+```{r residual-plots, fig.width=8, fig.height=6}
+for (m in list(model_focused, model_multi)) {
+  plot(fitted(m), residuals(m),
+       xlab = "Fitted values", ylab = "Residuals")
+  abline(h = 0, lty = 2)
+  qqnorm(residuals(m))
+  qqline(residuals(m))
+}
+```
+
+Residual plots help assess departures from constant variance and
+normality. Non-significant diagnostic tests do not prove that
+assumptions hold. A non-singular fit alone does not validate a model.
 
 ## Interactive app
 
-The Shiny app provides controls for exploring observed questionnaire data
-and comparing simulated team-formation strategies. From the project root,
-launch it with:
+From this project's RStudio session, run the following chunk manually
+to launch the app. It is excluded from knitting because the app stays
+running until stopped.
 
-```{r launch-app, eval=FALSE}
+```{r launch-app, eval=FALSE, echo=TRUE}
 shiny::runApp("Shiny_App.R")
 ```
 
-The app and standalone simulation use `simulation_core.R` for shared
-simulation calculations. `data_simulation_copy.R` is a separate copy; the
-main simulation script documented here is `data_simulation.R`.
+The app uses the bundled simulation output. To regenerate that output,
+run this chunk before launching the app:
 
-## Project files
-
-- `data/` — raw and processed questionnaire data files.
-- `figures/` — analysis figures.
-- `src/` — additional analysis and modeling scripts.
-- `data_processing.R` — scores the observed questionnaire data and fits the exploratory model.
-- `data_simulation.R` — standalone simulation script.
-- `simulation_core.R` — shared simulation functions.
-- `sanity_checks.R` — quick checks for team assignment and strategy outcomes.
-- `Shiny_App.R` — interactive Shiny app.
-- `main.Rmd` — this report.
+```{r regenerate-simulation, eval=FALSE, echo=TRUE}
+source("data_simulation.R")
+```
 
 ## Limitations
 
-The observed sample is small, and participants belong to existing teams.
-Analyses should account for that grouping where appropriate. Observed
-associations do not establish causation. Simulated results depend on the
-assumptions and settings selected in the simulation.
+The sample is small and participants are clustered within teams.
+Results are exploratory and do not establish causation.
+Scoring choices and missing-response handling should be checked
+against the questionnaire documentation.
+
+Simulation results describe hypothetical assumptions, not validated
+predictions of real team performance.
 
 ## References
 
-- Zähl, P. (2023). *The Influence of HEXACO Personality Traits on the Teamwork Quality in Student Software Teams — Supplementary Material*. [OSF project](https://osf.io/jb94w/overview); [original dataset download](https://osf.io/download/k4syv/).
-- [Dataset catalogue and licence attribution (CC BY 4.0)](https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/).
+- Philipp Zähl (2023), supplementary research data:
+  https://osf.io/jb94w/
+- Dataset description:
+  https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/
+
+## Software information
+
+```{r session}
+sessionInfo()
+```
