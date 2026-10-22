@@ -1,6 +1,20 @@
 # Personality & Teamwork Quality Explorer
 
-This project explores HEXACO personality and teamwork-quality questionnaire data. It contains an exploratory analysis, a standalone data simulation, and a Shiny app. Simulated outcomes reflect assumptions for exploration; they are not estimates or predictions for real teams.
+This project explores relationships between HEXACO personality traits
+and teamwork quality using questionnaire data.
+
+The Shiny app lets users visualize observed relationships and run
+hypothetical simulations comparing three team-formation strategies:
+random assignment, balancing personality scores across teams, and
+grouping people with similar scores.
+
+Simulated outcomes depend on user-selected assumptions. They do not
+demonstrate that a grouping strategy improves teamwork in practice.
+
+This project was developed for the Programming in Psychological Science
+course at the University of Amsterdam.
+
+## Dataset
 
 ## Project structure
 
@@ -22,7 +36,7 @@ Open `group-project.Rproj` in RStudio so the project root is the working directo
 
 To run the analysis, use `source("data_processing.R")`. To regenerate the simulation output used by the app, use `source("data_simulation.R")`. It reads the bundled `data/processed_data.csv` and writes its CSV and PNG outputs under `simulated_data/`. The Shiny app reads `simulated_data/combined_individual_level_results.csv`; regenerate that file before running the app if you want it to reflect a new simulation.
 
-Run `source("sanity_checks.R")` for quick checks of team sizes, expected between-team variance ordering on a fixed example, and zero-effect outcome comparisons.
+It contains personality questionnaire responses from students in software teams, along with separate measures of teamwork quality, including cohesion, communication, coordination, commitment, support, and balance.  
 
 The same entry points are available through `project.R`:
 
@@ -38,4 +52,25 @@ To knit `main.Rmd`, open it in RStudio and select **Knit**. The report runs the 
 
 ## Data provenance
 
-`data/HEXACO_TWQ_raw-data.csv` is the unchanged dataset copy from Zähl (2023). See `main.Rmd` for the source, download, and catalogue links. Review the scoring notes and limitations in the report before interpreting the exploratory analyses or simulation results.
+- Teamwork quality data 
+
+- All related dataset tables 
+
+Why it fits 
+
+You can investigate whether personality traits are associated with teamwork quality, and which dimensions of teamwork show the strongest relationships.  
+
+Important limitation 
+
+The personality table has 54 respondents, with 60 questionnaire items per respondent. The accessible data description doesn't establish that you have enough team-level observations and performance outcomes to train a reliable team-performance predictor.
+
+## Requirements
+
+Use R and RStudio. Install the required packages by running this command
+in the RStudio Console:
+
+```r
+install.packages(c("shiny", "ggplot2", "tidyr"))
+```
+
+An internet connection is required to download the dataset from OSF.
