@@ -107,6 +107,139 @@ Residual plots help assess departures from constant variance and
 normality. Non-significant diagnostic tests do not prove that
 assumptions hold. A non-singular fit alone does not validate a model.
 
+## Simulation
+
+The standalone `data_simulation.R` script generates hypothetical HEXACO
+profiles and teamwork-quality outcomes using assumptions described in that
+script. It reads processed questionnaire scores from `data/processed_data.csv`,
+uses shared calculations from `simulation_core.R`, and saves its outputs under
+`simulated_data/`.
+
+The current saved run compares two paired scenarios: low target diversity
+(0.20) and high target diversity (0.80), with 500 teams of four people in each
+scenario. The tables and figures below show the most recently saved run. They
+are simulation results under the stated assumptions, not observed effects in
+real teams.
+
+### Simulated teamwork-quality scores
+
+```{r simulation-outcome-summary}
+simulated_summary <- read.csv(
+  "simulated_data/teamwork_quality_summary.csv",
+  check.names = FALSE
+)
+knitr::kable(
+  simulated_summary[, c("Scenario", "outcome_label", "n_participants",
+                        "mean_score", "sd_score")],
+  digits = 2,
+  col.names = c("Scenario", "Outcome", "Participants", "Mean", "SD"),
+  caption = "Simulated teamwork-quality score summaries"
+)
+```
+
+### Achieved diversity
+
+This table compares the requested within-team trait SD with the average SD
+actually achieved in the generated teams.
+
+```{r simulation-diversity-summary}
+diversity_summary <- read.csv(
+  "simulated_data/diversity_summary.csv",
+  check.names = FALSE
+)
+knitr::kable(
+  diversity_summary[, c("Scenario", "trait_label", "target_sd",
+                        "mean_achieved_sd", "sd_across_teams")],
+  digits = 3,
+  col.names = c("Scenario", "Trait", "Target SD", "Achieved mean SD",
+                "SD across teams"),
+  caption = "Target and achieved within-team trait diversity"
+)
+```
+
+### Paired high-versus-low comparisons
+
+Teams in the high- and low-diversity scenarios are paired in the simulation.
+The intervals below describe variation across those simulated teams under the
+chosen assumptions; they do not estimate real-world effects.
+
+```{r simulation-paired-summary}
+paired_differences <- read.csv(
+  "simulated_data/paired_team_level_differences.csv",
+  check.names = FALSE
+)
+knitr::kable(
+  paired_differences[, c("outcome_label", "n_teams", "mean_difference",
+                         "ci_low", "ci_high", "paired_cohens_dz")],
+  digits = 3,
+  col.names = c("Outcome", "Teams", "High minus low", "95% CI low",
+                "95% CI high", "Paired effect size"),
+  caption = "Paired team-level outcome differences"
+)
+```
+
+### Simulation figures
+
+```{r sim-figure-01, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/01_hexaco_score_distributions.png")
+```
+
+```{r sim-figure-02, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/02_within_team_diversity.png")
+```
+
+```{r sim-figure-03, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/03_teamwork_outcome_distributions.png")
+```
+
+```{r sim-figure-04, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/04_teamwork_mean_comparison.png")
+```
+
+```{r sim-figure-05, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/05_individual_personality_effects.png")
+```
+
+```{r sim-figure-06, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/06_paired_team_level_differences.png")
+```
+
+```{r sim-figure-07, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/07_diversity_dose_response.png")
+```
+
+```{r sim-figure-08, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/08_multivariate_team_diversity.png")
+```
+
+```{r sim-figure-09, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/09_team_composition_effects.png")
+```
+
+```{r sim-figure-10, out.width="100%"}
+knitr::include_graphics("simulated_data/plots/10_assumption_sensitivity.png")
+```
+
+These figures and tables use the latest generated files in `simulated_data/`.
+To refresh them, run the regeneration chunk below before knitting the report.
+The chunk is disabled by default because the full simulation takes time to run.
+
+### Simulation sanity checks
+
+The project includes quick, deterministic checks of the shared simulation
+logic. They verify that all three grouping strategies create teams of the
+requested size, that Balanced and Similar produce the expected between-team
+variance ordering on a fixed example, and that zero composition and diversity
+effects produce no strategy differences when the residual draws are shared.
+
+```{r simulation-sanity-checks}
+source("sanity_checks.R")
+```
+
+The variance ordering is checked on a fixed example so the check is
+reproducible; a random simulation can occasionally show a different ordering
+by chance.
+
 ## Interactive app
 
 From this project's RStudio session, run the following chunk manually
