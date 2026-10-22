@@ -7,7 +7,7 @@ This project explores the relationship between HEXACO personality traits and tea
 ## Dependencies
 To run this project, you need R (version 4.0 or higher) and the following packages. You can install them using:
 ```R
-install.packages(c("shiny", "ggplot2", "dplyr", "tidyr", "lme4", "broom.mixed", "performance", "reshape2", "psych"))
+install.packages(c("shiny", "ggplot2", "dplyr", "tidyr", "lme4", "broom.mixed", "performance", "reshape2", "see", "psych"))
 ```
 
 ## Repository Structure
