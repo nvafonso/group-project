@@ -26,7 +26,10 @@ The analysis below examines the association between agreeableness
 and reported communication quality.
 
 ```{r analysis}
-source("data_processing.R")
+source("data_processing.R")     # GIVES ERROR 
+#                            Warning in file(file, "rt") :
+#                            cannot open file 'data/HEXACO_TWQ_raw-data.csv': No such file or directory
+#                            Error in file(file, "rt") : cannot open the connection
 summary(model)
 print(communication_plot)
 ```
