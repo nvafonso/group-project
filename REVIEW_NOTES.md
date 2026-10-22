@@ -1,80 +1,35 @@
 # Review and handoff notes
 
-## Status
+## Current project structure
 
-Prepared from the five uploaded files and the previously supplied raw CSV.
-This is a proposed integration package, not a verified final submission.
-R is unavailable in the preparation environment: no Knit or Shiny execution is
-claimed. Static checks confirm referenced files exist and the raw copy is unchanged.
-The separate simulation is the code from `Pasted text(6).txt`, saved under its own
-header's filename `src/data_simulation.R`; its contents are unchanged.
+The current entry points are in the project root:
 
-## Changes requiring teammate review
+- `data_processing.R` — scores the raw questionnaire data and fits the exploratory analysis.
+- `data_simulation.R` — runs the standalone simulation using `data/processed_data.csv`.
+- `simulation_core.R` — shared simulation calculations; the Shiny app also uses it for team assignments.
+- `Shiny_App.R` — launches the app.
+- `sanity_checks.R` — runs deterministic checks of team assignments and zero-effect outcomes.
+- `main.Rmd` — project report.
+- `project.R` — convenience functions for running the analysis, simulation, or app.
 
-- Supporting R files moved to `src/`; raw data placed in `data/`.
-- `src/project.R` supplies three entry functions. Each component is sourced in a
-  separate environment so its generic objects such as df do not overwrite another's.
-- Observed script reads the bundled raw CSV; summary-table columns use `=` instead
-  of assignment expressions; the Agreeableness label spelling is corrected.
-- App reads the same bundled CSV and checks required item columns.
-- App selectInput vectors now map readable labels to internal score names. Previously
-  the label/value direction was reversed, so inputs could refer to absent columns.
-- Strategy plot averages now group by BOTH simulation run and strategy. Previously
-  all strategies were averaged together within each run.
-- App aggregate summary uses the returned matrix directly instead of calling
-  do.call(rbind, ...) on that matrix.
-- App simulation sets seed 101 each time for reproducibility with identical controls.
-- README and main document explain both distinct simulations, provide entry points,
-  and use dynamically calculated observed-model estimates rather than fixed results.
-- No empirical coefficients, inferential method, scoring keys, missing-item policy,
-  or simulation effects have been changed.
+The `src/` folder and `data_simulation_copy.R` contain other or older scripts. They are not the current app or standalone simulation entry points.
 
-## Decisions for the analysis and app authors
+## Data flow and requirements
 
-1. Check raw item coding and scale keys against the original questionnaire.
-2. Agree on missing-item handling: observed script uses available items; app requires
-   complete scales. Report exclusions and a minimum answered-item rule if adopted.
-3. Review regression dependence: respondents share teams. Ordinary lm intervals do
-   not account for clustering. Choose and justify an appropriate final method.
-4. Document selection of agreeableness/communication after inspecting correlations;
-   do not present its ordinary p-value as a preplanned confirmatory test.
-5. App model centers/scales team means and diversity WITHIN each strategy/run.
-   Before clipping, average standardized contributions are zero. Consequently it
-   cannot use an overall mean increase to demonstrate a balancing benefit. Decide
-   whether variance between teams is the intended comparison or revise the model.
-6. App results are event-triggered, while labels/metric controls remain live. Rerun
-   after every control change, or make the app display the settings of the saved run.
-7. Standalone simulation coefficients are illustrative and currently lack theoretical
-   effect-size justification. Supply rationale if the simulation is a graded component.
-8. Standalone team means are fixed and traits generated separately; this omits real
-   between-team mean variation and multivariate personality correlation structure.
-9. Generated paired-team intervals quantify the assumed simulation, not evidence
-   about real teams. The sensitivity exercise changes all trait SD targets together.
+- The analysis and app use the raw questionnaire file at `data/HEXACO_TWQ_raw-data.csv`.
+- The standalone simulation reads the processed file at `data/processed_data.csv`. It does not create that file automatically.
+- The standalone simulation writes its outputs to `simulated_data/`.
+- The app's simulated-data option requires `simulated_data/combined_individual_level_results.csv`. Include that file in the GitHub repository or deployment bundle.
+- The app's interactive team comparison uses its own controls and simulation loop, with shared calculations from `simulation_core.R`; it is not simply a display of the standalone simulation output.
+- `main.Rmd` runs the analysis and sanity checks when knitted. Its simulation-generation chunk is disabled by default.
 
-## Manual acceptance check (record actual outcomes in the pull request)
+## Interpretation and review points
 
-- Open a fresh copy using group-project.Rproj, install dependencies, restart R.
-- Knit main.Rmd with run_simulation: true. Verify descriptive table, regression,
-  observed plot, simulation table/plot, references, and session information appear.
-- Verify both simulation scenarios report 500 teams, 2,000 participants, finite
-  outcomes in 1–5, and the expected target/achieved diversity summaries.
-- Run the manual app chunk. Check every dropdown selects available columns.
-- Run comparison at small settings (e.g. 3 teams, 4 members, 100 repetitions), then
-  default settings. Check plots and summary table render without errors.
-- Run the same settings twice: results should match. Change effects, rerun, and
-  check expected model-dependent changes. Check composition-only view too.
-- Stop the app; confirm the main report can still Knit in a fresh R session.
-- Compare app plot run averages to the strategy summary; do not require strategies
-  to differ when the selected assumptions imply no meaningful difference.
-- Have another member run the full instructions on their computer.
+- The simulation uses assumptions for trait effects, diversity effects, and outcome generation. These are exploratory settings, not causal estimates or predictions about real teams.
+- The variance-ordering sanity check uses a fixed example so it is reproducible. It does not guarantee that every random simulation run will have that ordering.
+- The observed dataset is small and participants belong to teams. Interpret individual-level associations with that clustering in mind.
+- Check that the questionnaire scoring and reverse-keying match the provided documentation before interpreting scores. The raw dataset is stored as an unchanged copy; the analysis applies its scoring rules to the item responses.
+- Record any remaining choices about missing responses and the interpretation of exploratory analyses.
 
-## Repository integration
 
-This candidate should be compared with current GitHub files before merging.
-It contains no .git directory, so it cannot replace repository history.
-Do not submit duplicate old root-level R scripts alongside src versions: after
-review, remove/move the obsolete copies using Git so there is one clear entry point.
-Keep unrelated teammate changes. Exclude prototype backups from the submitted repo.
-After a reviewer accepts the changes, merge the PR into main. Each person must also
-complete a substantive review of another person's PR; no generated text substitutes
-for actually running and reviewing that contribution.
+Record the actual results of these checks before submission. Static file and path checks alone do not confirm that the app or report runs successfully.
