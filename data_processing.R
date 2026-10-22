@@ -123,3 +123,5 @@ communication_plot <- ggplot(df, aes(x = agreeableness, y = communication)) +
 model <- lm(communication ~ agreeableness, data = df)
 summary(model)
 
+write.csv(df_clean, "processed_data.csv", row.names = FALSE)
+write.csv(df, "processed_data_raw.csv", row.names = FALSE)
