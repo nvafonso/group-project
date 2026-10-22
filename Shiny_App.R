@@ -2,7 +2,7 @@
 #app.R
 # Main file for the HEXACO & Teamwork Quality Explorer Shiny application.
 # HEXACO & Teamwork Quality Explorer
-# Run with: shiny::runApp("hexaco_teamwork_shiny_v2")
+# Run from the project root: source("src/project.R"); launch_app()
 #
 # Observed-data exploration is separate from hypothetical simulation.
 # Simulation scores are illustrative assumptions, not empirical predictions.
@@ -11,8 +11,7 @@
 library(shiny)
 library(ggplot2)
 
-# URL used to download the dataset if no local data.csv file is available.
-data_url <- "https://osf.io/download/k4syv/"
+# Dataset provenance: https://osf.io/download/k4syv/; the bundled raw CSV is used.
 
 # Define which questionnaire columns belong to each of the six HEXACO traits.
 # The names ending in 'r' indicate reverse-keyed items; see reverse_hexaco below.
@@ -54,21 +53,14 @@ nice_names <- c(
   commitment = "Commitment", cohesion = "Cohesion"
 )
 
-# Load the dataset. Prefer a local data.csv file; otherwise try downloading it.
-# read.csv2 and read.csv handle different common CSV separator conventions.
+# Load the bundled semicolon-separated raw questionnaire data.
 load_data <- function() {
-  if (file.exists("data.csv")) {
-    d <- read.csv("data.csv", check.names = FALSE)
-  } else {
-    d <- tryCatch(read.csv2(data_url, check.names = FALSE), error = function(e) NULL)
-    if (is.null(d) || !nrow(d)) {
-      d <- tryCatch(read.csv(data_url, check.names = FALSE), error = function(e) NULL)
-    }
-  }
-  validate(need(!is.null(d) && nrow(d) > 0, paste(
-    "Could not load the dataset. Check your internet connection or place a copy",
-    "of the dataset in this folder as data.csv."
-  )))
+  path <- "data/HEXACO_TWQ_raw-data.csv"
+  if (!file.exists(path)) stop("Open the project from its root folder; missing ", path)
+  d <- read.csv(path, sep = ";", check.names = FALSE)
+  required <- unique(c(unlist(hexaco_items), unlist(twq_items)))
+  missing <- setdiff(required, names(d))
+  if (length(missing)) stop("Missing questionnaire columns: ", paste(missing, collapse = ", "))
   d
 }
 
@@ -146,8 +138,8 @@ ui <- fluidPage(
         sidebarPanel(
           h4("Choose your variables"),
           p(class="section-intro","Compare a personality trait with one teamwork-quality dimension."),
-          selectInput("trait","HEXACO trait",choices=nice_names[names(hexaco_items)],selected="agreeableness"),
-          selectInput("outcome","Teamwork-quality dimension",choices=nice_names[names(twq_items)],selected="communication"),
+          selectInput("trait","HEXACO trait",choices=setNames(names(hexaco_items), unname(nice_names[names(hexaco_items)])),selected="agreeableness"),
+          selectInput("outcome","Teamwork-quality dimension",choices=setNames(names(twq_items), unname(nice_names[names(twq_items)])),selected="communication"),
           checkboxInput("show_lm","Show trend line and confidence band",TRUE),
           helpText("Each point represents one participant.")
         ),
@@ -174,8 +166,8 @@ ui <- fluidPage(
           radioButtons("research_question","What would you like to investigate?",
              choices=c("Composition effect"="composition","Grouping-strategy effect"="strategy","Both effects"="both"),
              selected="both"),
-          selectInput("sim_trait","Personality trait",choices=nice_names[names(hexaco_items)],selected="agreeableness"),
-          selectInput("sim_outcome","Teamwork-quality dimension",choices=nice_names[names(twq_items)],selected="communication"),
+          selectInput("sim_trait","Personality trait",choices=setNames(names(hexaco_items), unname(nice_names[names(hexaco_items)])),selected="agreeableness"),
+          selectInput("sim_outcome","Teamwork-quality dimension",choices=setNames(names(twq_items), unname(nice_names[names(twq_items)])),selected="communication"),
           sliderInput("composition_effect","Assumed effect of team mean trait score",min=0,max=1,value=0.3,step=0.05),
           sliderInput("diversity_effect","Assumed effect of within-team trait diversity",min=-1,max=1,value=0,step=0.05),
           sliderInput("noise_sd","Random noise (SD)",min=0,max=1.5,value=0.4,step=0.05),
@@ -262,6 +254,7 @@ server <- function(input,output,session) {
   # Recalculate the simulation when the user clicks the Run comparison button.
   # The generated scores are hypothetical and depend on user-selected assumptions.
   simulations <- eventReactive(input$run_sim, {
+    set.seed(101) # Repeating identical settings reproduces the same simulated sample.
     d <- raw_data()
     validate(need(input$sim_trait %in% names(d) && input$sim_outcome %in% names(d),"Selected scores unavailable."))
     x <- d[[input$sim_trait]]
@@ -345,7 +338,7 @@ server <- function(input,output,session) {
   output$strategy_plot <- renderPlot({
     z <- selected_results()
     validate(need(nrow(z)>0,"Run the simulation to see results."))
-    z$run_average <- ave(z$simulated_quality,z$run, FUN=mean)
+    z$run_average <- ave(z$simulated_quality, z$run, z$strategy, FUN=mean)
     if (input$research_question=="composition") {
       ggplot(z,aes(x=mean_trait,y=simulated_quality))+
         geom_point(alpha=.15,colour="#28778D")+
@@ -391,7 +384,7 @@ server <- function(input,output,session) {
     run_avg <- aggregate(simulated_quality~run+strategy,data=z,FUN=mean)
     out <- aggregate(simulated_quality~strategy,data=run_avg,
       FUN=function(v)c(mean=mean(v),sd=sd(v),q025=unname(quantile(v,.025)),q975=unname(quantile(v,.975))))
-    vals <- do.call(rbind,out$simulated_quality)
+    vals <- out$simulated_quality
     data.frame(
       Strategy=out$strategy,
       `Mean across runs`=round(vals[,"mean"],3),

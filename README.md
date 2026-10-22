@@ -1,34 +1,16 @@
-# group-project
+# Raw data provenance
 
+`HEXACO_TWQ_raw-data.csv` is an unchanged copy of the file uploaded for this group
+project: 54 rows, 105 columns, semicolon-separated, with participant and team IDs.
 
-https://osf.io/jb94w/overview                     <- explanation of variables 
+Source: Zähl, P. (2023). The Influence of HEXACO Personality Traits on the Teamwork
+Quality in Student Software Teams — Supplementary Material. OSF.
+https://osf.io/jb94w/
+Original download: https://osf.io/download/k4syv/
+Catalogue and licence attribution (CC BY 4.0):
+https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/
 
-https://itemresponsewarehouse.org/tables/zaehl2023_hexaco/    
-
-the complete dataset is there: df <- read.csv2("https://osf.io/download/k4syv/")
- 
-
-HEXACO personality and teamwork dataset 
-
-Source: Philipp Zähl (2023), supplementary research data 
-
-This is the closest match I found to your idea. It contains personality questionnaire responses from students in software teams, along with separate measures of teamwork quality, including cohesion, communication, coordination, commitment, support, and balance.  
-
-Item Response Warehouse 
-
-
-Useful links: 
-
-- Personality data and codebook 
-
-- Teamwork quality data 
-
-- All related dataset tables 
-
-Why it fits 
-
-You can investigate whether personality traits are associated with teamwork quality, and which dimensions of teamwork show the strongest relationships.  
-
-Important limitation 
-
-The personality table has 54 respondents, with 60 questionnaire items per respondent. The accessible data description doesn't establish that you have enough team-level observations and performance outcomes to train a reliable team-performance predictor.
+No questionnaire values were changed in the raw file. Scores are calculated at run
+time. The supplied code assumes the columns marked r still require reversing.
+The analysis author must verify this against the original questionnaire before
+interpreting results. Do not reverse already-scored data a second time.
